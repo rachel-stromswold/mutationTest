@@ -13,4 +13,32 @@ Specify the length of the bitmask to be created. Note that this option cannot be
 Specify the seed to be used for the random number generator.
 ### -q
 Specify quiet execution. If passed, the only output data will be 6 fields with data as follows:
+
 \[total time for trad. method\] \[avg time for trad.\] \[total time for new method w/ recursion] \[avg time for new method w/ recursion\] \[avg time for new method wo recursion\] \[avg time for new method wo recurion\]
+
+## Example
+```
+\[bin\]$ ./testPrg -d
+Running with:
+        trials:            10000
+        seed:              3141593
+        length:            8
+        prob:              0.01
+        test distribution? yes
+Bernoulli time              : 11566108  avg: 1156.61
+binomial time (w/ recursion): 2661783   avg: 266.178
+binomial time (wo recursion): 2421754   avg: 242.175
+```
+
+```
+\[bin\]$ ./testPrg -s 2718282 -l 16 -n 100000 -p 0.05
+Running with:
+        trials:            100000
+        seed:              2718282
+        length:            16
+        prob:              0.05
+        test distribution? no
+Bernoulli time              : 133176005 avg: 1331.76
+binomial time (w/ recursion): 36425975  avg: 364.26
+binomial time (wo recursion): 34986643  avg: 249.866
+```
