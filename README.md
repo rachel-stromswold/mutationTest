@@ -18,7 +18,7 @@ Specify quiet execution. If passed, the only output data will be 6 fields with d
 
 ## Example
 ```
-\[bin\]$ ./testPrg -d
+[bin]$ ./testPrg -d
 Running with:
         trials:            10000
         seed:              3141593
@@ -31,7 +31,7 @@ binomial time (wo recursion): 2421754   avg: 242.175
 ```
 
 ```
-\[bin\]$ ./testPrg -s 2718282 -l 16 -n 100000 -p 0.05
+[bin]$ ./testPrg -s 2718282 -l 16 -n 100000 -p 0.05
 Running with:
         trials:            100000
         seed:              2718282
