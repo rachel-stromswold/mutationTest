@@ -1,46 +1,251 @@
 #include "main.h"
 
-//combinatorics
-unsigned int choose( unsigned int n, unsigned int k ) {
-  if (k > n) return 0;
-  if (k * 2 > n) k = n-k;
-  if (k == 0) return 1;
-
-  unsigned int result = n;
-  for( unsigned int i = 2; i <= k; ++i ) {
-    result *= (n-i+1);
-    result /= i;
-  }
-  return result;
-}
-
-//This is the function f described in the documentation.
-unsigned getBitStream (unsigned n, unsigned k, unsigned x) {
-  if (k == 0) { return 0; }
-//  if (k == n) { return (0x01 << n)-1; }
-	
-  if (x < choose(n-1, k-1) ) {
-    return 0x01 | (getBitStream(n-1, k-1, x) << 1);
-  } else {
-    return getBitStream( n-1, k, x-choose(n-1, k-1) ) << 1;
-  }
-}
-
-//This is the same function f, but implemented without recursion. It is slightly faster.
-unsigned getBitStream2 (unsigned n, unsigned k, unsigned x) {
-  unsigned ret = 0;
-  for (unsigned i = 0; k > 0 && i < n; ++i) {
-/*    if (k == n-i) {
-      ret = ret | ( ((0x01 << (n-i)) - 1) << i);
-      break;
-    }*/
-    if (x < choose((n-i)-1, k-1) ) {
-      ret = ret | (0x01 << i);
-      k--;
-    } else {
-      x -= choose((n-i)-1, k-1);
+std::vector<unsigned> sample_bernoulli(unsigned n, double p, std::mt19937& generator, unsigned n_trials=1) {
+  std::bernoulli_distribution bern(p);
+  std::vector<unsigned> ret(n_trials, 0);
+  for (unsigned i = 0; i < n_trials; ++i) {
+    unsigned berVal = 0;
+    for (unsigned j = 0; j < n; ++j) {
+      if ( bern( generator ) ) {
+        berVal = berVal | (0x01 << j);
+      }
     }
+    
+    ret[i] = berVal;
   }
+  return ret;
+}
+
+/*std::vector<unsigned> sample_binomial_shuffle(unsigned n, double p, std::mt19937& generator, unsigned n_trials=1) {
+  //use the modified procedure, store each mutation mask in the binTest array
+  std::binomial_distribution<unsigned> bin(n, p);
+  std::vector<unsigned> ret(n_trials);
+  for (unsigned i = 0; i < n_trials; ++i) {
+    unsigned num_ones = bin(generator);
+    unsigned val;
+
+    for (unsigned j = 0; j < num_ones; ++j) {
+      std::uniform_int_distribution<unsigned> unif(0, j);
+      unsigned t = 1 << unif(generator);
+      if ((val & t) != 0) {
+        val = val | (1 << j);
+      } else {
+        val = val | t;
+      }
+    }
+    ret[i] = val;
+  }
+  return ret;
+}
+
+std::vector<unsigned> sample_binomial(unsigned n, double p, std::mt19937& generator, unsigned n_trials=1) {
+  unsigned invert = 0;
+  if (p > 0.5) {
+    invert=(2 << n) - 1;
+    p=1-p;
+  }
+  //use the modified procedure, store each mutation mask in the binTest array
+  std::binomial_distribution<unsigned> bin(n, p);
+  std::vector<std::uniform_int_distribution<unsigned>>
+  std::vector<unsigned> ret(n_trials);
+  for (unsigned i = 0; i < n_trials; ++i) {
+    unsigned num_ones = bin(generator);
+
+    //minus 1 because we start indexing from 0
+    std::uniform_int_distribution<unsigned> unif(0, choose(n, num_ones) - 1);
+    unsigned binVal = get_bit_stream(n, num_ones, unif(generator));
+    ret[i] = invert ^ binVal;
+  }
+  return ret;
+}
+
+std::vector<unsigned> sample_binomial_slow(unsigned n, double p, std::mt19937& generator, unsigned n_trials=1) {
+  //use the modified procedure, store each mutation mask in the binTest array
+  std::binomial_distribution<unsigned> bin(n, p);
+  std::vector<unsigned> ret(n_trials);
+  std::vector<unsigned> choosevals(n+1);
+  for (unsigned i = 0; 2*i <= n; ++i) {
+    choosevals[i] = choose(n, i);
+    choosevals[n-i] = choosevals[i];
+  }
+  for (unsigned i = 0; i < n_trials; ++i) {
+    unsigned num_ones = bin(generator);
+
+    //minus 1 because we start indexing from 0
+    std::uniform_int_distribution<unsigned> dist(0, choose(n, num_ones) - 1);
+    unsigned binVal = get_bit_stream_slow(n, num_ones, dist(generator));
+    ret[i] = binVal;
+  }
+  return ret;
+}
+
+std::vector<unsigned> sample_poisson(unsigned n, double p, std::mt19937& generator, unsigned n_trials=1) {
+  double lambda = n*log(1-p);
+  //use the modified procedure, store each mutation mask in the binTest array
+  std::poisson_distribution<unsigned> poiss(lambda);
+  std::uniform_int_distribution<unsigned> unif(0, n-1);
+  std::vector<unsigned> ret(n_trials);
+  for (unsigned i = 0; i < n_trials; ++i) {
+    unsigned n_strings = poiss(generator);
+    unsigned val = 0;
+    for (unsigned j = 0; j < n_strings; ++j) {
+      val = val | (1 << unif(generator));
+    }
+    ret[i] = val;
+  }
+  return ret;
+}*/
+
+struct OccurrenceCounter {
+  unsigned bernoulli_occurrences = 0;
+  unsigned poisson_occurrences = 0;
+  unsigned binomial_old_occurrences = 0;
+  unsigned binomial_new_occurrences = 0;
+  unsigned digit_occurrences = 0;
+};
+
+struct TimingStats {
+  unsigned bernoulli_total = 0;
+  unsigned poisson_total = 0;
+  unsigned binomial_old_total = 0;
+  unsigned binomial_new_total = 0;
+  double hybrid_poisson_total = 0;
+  double hybrid_binomial_total = 0;
+
+  double bernoulli_avg = 0;
+  double poisson_avg = 0;
+  double binomial_old_avg = 0;
+  double binomial_new_avg = 0;
+  double hybrid_poisson_avg = 0;
+  double hybrid_binomial_avg = 0;
+};
+
+TimingStats test_non_hybrid(unsigned n_trials, unsigned len, double p, unsigned seed=DEF_SEED) {
+  std::mt19937 generator;
+  generator.seed(seed);
+
+  //create the return value
+  TimingStats ret;
+  //initialize the random samplers
+  RepeatBernoulli bern(len, p);
+  BinomialShuffleOld bin_old(len, p);
+  BinomialShufflePrecompute bin_new(len, p);
+  PoissonOr poisson(len, p);
+  FiniteDigit digit(len, p);
+  BinomialShufflePrecompute bin_correction(len, digit.get_correction());
+  PoissonOr poi_correction(len, digit.get_correction());
+  //initialize the data storage
+  std::vector<unsigned int> ber_test(n_trials);
+  std::vector<unsigned int> poisson_test(n_trials);
+  std::vector<unsigned int> bin_test_old(n_trials);
+  std::vector<unsigned int> bin_test_new(n_trials);
+  std::vector<unsigned int> digit_test(n_trials);
+
+  //perform the test using the traditional method, store each mutation in the bernTest array
+  auto begin = std::chrono::high_resolution_clock::now();
+  for (unsigned i = 0; i < n_trials; ++i) {
+    ber_test[i] = bern(generator);
+  }
+  auto end = std::chrono::high_resolution_clock::now();
+  ret.bernoulli_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
+  
+  //initialize the clock for the poisson method
+  begin = std::chrono::high_resolution_clock::now();
+  for (unsigned i = 0; i < n_trials; ++i) {
+    poisson_test[i] = poisson(generator);
+  }
+  end = std::chrono::high_resolution_clock::now();
+  ret.poisson_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
+
+  //initialize the clock for the old binomial shuffle
+  begin = std::chrono::high_resolution_clock::now();
+  for (unsigned i = 0; i < n_trials; ++i) {
+    bin_test_old[i] = bin_old(generator);
+  }
+  end = std::chrono::high_resolution_clock::now();
+  ret.binomial_old_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
+  
+  //initialize the clock for the new binomial shuffle
+  begin = std::chrono::high_resolution_clock::now();
+  for (unsigned i = 0; i < n_trials; ++i) {
+    bin_test_new[i] = bin_new(generator);
+  }
+  end = std::chrono::high_resolution_clock::now();
+  ret.binomial_new_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
+
+  if (digit.get_correction() == 0) {
+    begin = std::chrono::high_resolution_clock::now();
+    for (unsigned i = 0; i < n_trials; ++i) {
+      digit_test[i] = digit(generator);
+    }
+    end = std::chrono::high_resolution_clock::now();
+    ret.hybrid_poisson_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
+    ret.hybrid_binomial_total = ret.hybrid_poisson_total;
+  } else {
+    //initialize the clock for the finite digit method (poisson correction)
+    begin = std::chrono::high_resolution_clock::now();
+    for (unsigned i = 0; i < n_trials; ++i) {
+      digit_test[i] = digit(generator);
+      digit_test[i] |= poi_correction(generator);
+    }
+    end = std::chrono::high_resolution_clock::now();
+    ret.hybrid_poisson_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
+
+    //initialize the clock for the finite digit method (new binomial correction)
+    begin = std::chrono::high_resolution_clock::now();
+    for (unsigned i = 0; i < n_trials; ++i) {
+      digit_test[i] = digit(generator);
+      digit_test[i] |= bin_correction(generator);
+    }
+    end = std::chrono::high_resolution_clock::now();
+    ret.hybrid_binomial_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
+  }
+
+  std::ofstream dout;
+  dout.open("dat.csv");
+  //number to track how many ones there are to go in ascending order
+  std::map<unsigned, OccurrenceCounter> histogram;
+  for (unsigned i = 0; i < n_trials; ++i) {
+    if (histogram.count(ber_test[i]) == 0) {
+      histogram[ber_test[i]] = OccurrenceCounter();
+    }
+    if (histogram.count(poisson_test[i]) == 0) {
+      histogram[poisson_test[i]] = OccurrenceCounter();
+    }
+    if (histogram.count(bin_test_old[i]) == 0) {
+      histogram[bin_test_old[i]] = OccurrenceCounter();
+    }
+    if (histogram.count(bin_test_new[i]) == 0) {
+      histogram[bin_test_new[i]] = OccurrenceCounter();
+    }
+    if (histogram.count(digit_test[i]) == 0) {
+      histogram[digit_test[i]] = OccurrenceCounter();
+    }
+    histogram[ber_test[i]].bernoulli_occurrences += 1;
+    histogram[poisson_test[i]].poisson_occurrences += 1;
+    histogram[bin_test_old[i]].binomial_old_occurrences += 1;
+    histogram[bin_test_new[i]].binomial_new_occurrences += 1;
+    histogram[digit_test[i]].digit_occurrences += 1;
+  }
+  dout << "result,bernoulli,poisson,binomial old,binomial new,hybrid poisson\n";
+  for (auto it = histogram.begin(); it != histogram.end(); ++it) {
+    dout << it->first << ","
+         << it->second.bernoulli_occurrences << ","
+         << it->second.poisson_occurrences << ","
+         << it->second.binomial_old_occurrences << ","
+         << it->second.binomial_new_occurrences << ","
+         << it->second.digit_occurrences << "," << std::endl;
+  }
+  dout.close();
+
+  //calculate averages
+  ret.bernoulli_avg = (double)ret.bernoulli_total / n_trials;
+  ret.poisson_avg = (double)ret.poisson_total / n_trials;
+  ret.binomial_old_avg = (double)ret.binomial_old_total / n_trials;
+  ret.binomial_new_avg = (double)ret.binomial_new_total / n_trials;
+  ret.hybrid_poisson_avg = (double)ret.hybrid_poisson_total / n_trials;
+  ret.hybrid_binomial_avg = (double)ret.hybrid_binomial_total / n_trials;
+
   return ret;
 }
 
@@ -57,8 +262,8 @@ int main(int argc, char** argv) {
     if (strcmp(argv[i], "-p") == 0 && i != argc - 1) {
       p = atof(argv[i+1]);
       if (p < 0.0 || p > 1.0) {
-	std::cout << "invalid probability" << std::endl;
-	exit(0);
+        std::cout << "invalid probability" << std::endl;
+        exit(0);
       }
       i++;
     }
@@ -67,11 +272,7 @@ int main(int argc, char** argv) {
       i++;
     }
     if (strcmp(argv[i], "-l") == 0 && i != argc - 1) {
-      if (dist_test && atoi(argv[i+1]) > 8) {
-	std::cout << "warning: -d flag set, setting length to 8\n";
-      } else {
-        len = atoi(argv[i+1]);
-      }
+      len = atoi(argv[i+1]);
       i++;
     }
     if (strcmp(argv[i], "-s") == 0 && i != argc - 1) {
@@ -82,118 +283,49 @@ int main(int argc, char** argv) {
       silent = true;
     }
     if (strcmp(argv[i], "-d") == 0) {
-      if (len > 8) {
-	std::cout << "warning: length longer than 8 bits, resetting\n";
-	len = 8;
-      }
       dist_test = true;
     }
   }
 
   if (!silent) {
     std::cout << "Running with:" << std::endl
-	      << "\ttrials:            " << n_trials << std::endl
-	      << "\tseed:              " << seed << std::endl
-	      << "\tlength:            " << len << std::endl
-	      << "\tprob:              " << p << std::endl;
+              << "\ttrials:            " << n_trials << std::endl
+              << "\tseed:              " << seed << std::endl
+              << "\tlength:            " << len << std::endl
+              << "\tprob:              " << p << std::endl;
     if (dist_test) {
-    std::cout << "\ttest distribution? yes\n";
+      std::cout << "\ttest distribution? yes\n";
     } else {
-    std::cout << "\ttest distribution? no\n";   
+      std::cout << "\ttest distribution? no\n";   
     }
   }
 
-  unsigned int berTest[UCHAR_MAX] = {};
+  /*unsigned int berTest[UCHAR_MAX] = {};
   unsigned int binTest[UCHAR_MAX] = {};
-  unsigned int binTest2[UCHAR_MAX] = {};
-
-  std::mt19937 generator;
-  generator.seed(seed);
-
-  //perform the test using the traditional method, store each mutation in the bernTest array
-  auto begin = std::chrono::high_resolution_clock::now();
-  std::bernoulli_distribution bern(p);
-  for (unsigned i = 0; i < n_trials; ++i) {
-    unsigned berVal = 0;
-    for (unsigned j = 0; j < len; ++j) {
-      if ( bern( generator ) ) {
-	berVal = berVal | (0x01 << j);
-      }
-    }
-    if (dist_test) {
-      berTest[berVal]++;
-    }
-  }
-  auto end = std::chrono::high_resolution_clock::now();
-  auto berDuration = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
-
-  //initialize the clock for the new method with recursion
-  begin = std::chrono::high_resolution_clock::now();
-  //use the modified procedure, store each mutation mask in the binTest array
-  std::binomial_distribution<unsigned> bin(len, p);
-  for (unsigned i = 0; i < n_trials; ++i) {
-    unsigned num_ones = bin(generator);
-
-    //minus 1 because we start indexing from 0
-    std::uniform_int_distribution<unsigned> dist(0, choose(len, num_ones) - 1);
-    if (dist_test) {
-      unsigned binVal = getBitStream(len, num_ones, dist(generator));
-      binTest[binVal]++;
-    } else {
-      getBitStream(len, num_ones, dist(generator));
-    }
-  }
-  end = std::chrono::high_resolution_clock::now();
-  auto binDuration = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
-  
-  //initialize the clock for the new method without recursion
-  begin = std::chrono::high_resolution_clock::now();
-  for (unsigned i = 0; i < n_trials; ++i) {
-    unsigned num_ones = bin(generator);
-
-    std::uniform_int_distribution<unsigned> dist(0, choose(len, num_ones) - 1);
-    if (dist_test) {
-      unsigned binVal = getBitStream2(len, num_ones, dist(generator));
-      binTest2[binVal]++;
-    } else {
-      getBitStream2(len, num_ones, dist(generator));
-    }
-  }
-  end = std::chrono::high_resolution_clock::now();
-  auto binDuration2 = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
+  unsigned int binTest2[UCHAR_MAX] = {};*/
 
   if (dist_test) {
-    std::ofstream dout;
-    dout.open("dat.csv");
-    //number to track how many ones there are to go in ascending order
-    unsigned m = 0;
-    unsigned lastShift = 0;
-    unsigned nextShift = 1;
-    for (unsigned i = 0; i <= UCHAR_MAX; ++i) {
-      if (i == nextShift) {
-	m++;
-	lastShift = nextShift;
-	nextShift += choose(8, m);
-      }
-      //update the outputted distribution graph
-      //masks are tracked in descending order of the number of 1 bits
-      int ind = getBitStream(8, m, i-lastShift);
-      dout << ind << "," << berTest[ind] << ","
-	   << binTest[ind] << "," << binTest2[ind] << std::endl;
+    TimingStats timings = test_non_hybrid(n_trials, len, p);
+    if (silent) {
+      std::cout << timings.bernoulli_total  << " " << timings.bernoulli_avg
+                << " " << timings.poisson_total << " " << timings.poisson_avg
+                << " " << timings.binomial_old_total << " " << timings.binomial_old_avg
+                << " " << timings.binomial_new_total << " " << timings.binomial_new_avg
+                << " " << timings.hybrid_poisson_total << " " << timings.hybrid_poisson_avg 
+                << " " << timings.hybrid_binomial_total << " " << timings.hybrid_binomial_avg << std::endl;
+    } else {
+      std::cout << "Bernoulli time:       " << timings.bernoulli_total
+                << " \tavg: " << timings.bernoulli_avg << std::endl
+                << "poisson time:         " << timings.poisson_total
+                << " \tavg: " << timings.poisson_avg << std::endl
+                << "binomial time (old):  " << timings.binomial_old_total
+                << " \tavg: " << timings.binomial_old_avg << std::endl
+                << "binomial time (new):  " << timings.binomial_new_total
+                << " \tavg: " << timings.binomial_new_avg << std::endl
+                << "hybrid poisson time:  " << timings.hybrid_poisson_total
+                << " \tavg: " << timings.hybrid_poisson_avg << std::endl
+                << "hybrid binomial time: " << timings.hybrid_binomial_total
+                << " \tavg: " << timings.hybrid_binomial_avg << std::endl;
     }
-    dout.close();
-  }
-
-  if (silent) {
-    std::cout << " " << berDuration << " " << double(berDuration)/n_trials
-	      << " " << binDuration << " " << double(binDuration)/n_trials
-	      << " " << binDuration2 << " " << double(binDuration2)/n_trials << " " << std::endl;
-  } else {
-    std::cout << "Bernoulli time              : " << berDuration
-	      << "\tavg: " << double(berDuration)/n_trials << std::endl
-	      << "binomial time (w/ recursion): " << binDuration
-	      << "\tavg: " << double(binDuration)/n_trials << std::endl
-	      << "binomial time (wo recursion): " << binDuration2
-	      << "\tavg: " << double(binDuration2)/n_trials << std::endl;
   }
 }
