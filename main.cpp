@@ -1,5 +1,7 @@
 #include "main.h"
 
+namespace plt = matplotlibcpp;
+
 std::vector<unsigned> sample_bernoulli(unsigned n, double p, std::mt19937& generator, unsigned n_trials=1) {
   std::bernoulli_distribution bern(p);
   std::vector<unsigned> ret(n_trials, 0);
@@ -15,86 +17,6 @@ std::vector<unsigned> sample_bernoulli(unsigned n, double p, std::mt19937& gener
   }
   return ret;
 }
-
-/*std::vector<unsigned> sample_binomial_shuffle(unsigned n, double p, std::mt19937& generator, unsigned n_trials=1) {
-  //use the modified procedure, store each mutation mask in the binTest array
-  std::binomial_distribution<unsigned> bin(n, p);
-  std::vector<unsigned> ret(n_trials);
-  for (unsigned i = 0; i < n_trials; ++i) {
-    unsigned num_ones = bin(generator);
-    unsigned val;
-
-    for (unsigned j = 0; j < num_ones; ++j) {
-      std::uniform_int_distribution<unsigned> unif(0, j);
-      unsigned t = 1 << unif(generator);
-      if ((val & t) != 0) {
-        val = val | (1 << j);
-      } else {
-        val = val | t;
-      }
-    }
-    ret[i] = val;
-  }
-  return ret;
-}
-
-std::vector<unsigned> sample_binomial(unsigned n, double p, std::mt19937& generator, unsigned n_trials=1) {
-  unsigned invert = 0;
-  if (p > 0.5) {
-    invert=(2 << n) - 1;
-    p=1-p;
-  }
-  //use the modified procedure, store each mutation mask in the binTest array
-  std::binomial_distribution<unsigned> bin(n, p);
-  std::vector<std::uniform_int_distribution<unsigned>>
-  std::vector<unsigned> ret(n_trials);
-  for (unsigned i = 0; i < n_trials; ++i) {
-    unsigned num_ones = bin(generator);
-
-    //minus 1 because we start indexing from 0
-    std::uniform_int_distribution<unsigned> unif(0, choose(n, num_ones) - 1);
-    unsigned binVal = get_bit_stream(n, num_ones, unif(generator));
-    ret[i] = invert ^ binVal;
-  }
-  return ret;
-}
-
-std::vector<unsigned> sample_binomial_slow(unsigned n, double p, std::mt19937& generator, unsigned n_trials=1) {
-  //use the modified procedure, store each mutation mask in the binTest array
-  std::binomial_distribution<unsigned> bin(n, p);
-  std::vector<unsigned> ret(n_trials);
-  std::vector<unsigned> choosevals(n+1);
-  for (unsigned i = 0; 2*i <= n; ++i) {
-    choosevals[i] = choose(n, i);
-    choosevals[n-i] = choosevals[i];
-  }
-  for (unsigned i = 0; i < n_trials; ++i) {
-    unsigned num_ones = bin(generator);
-
-    //minus 1 because we start indexing from 0
-    std::uniform_int_distribution<unsigned> dist(0, choose(n, num_ones) - 1);
-    unsigned binVal = get_bit_stream_slow(n, num_ones, dist(generator));
-    ret[i] = binVal;
-  }
-  return ret;
-}
-
-std::vector<unsigned> sample_poisson(unsigned n, double p, std::mt19937& generator, unsigned n_trials=1) {
-  double lambda = n*log(1-p);
-  //use the modified procedure, store each mutation mask in the binTest array
-  std::poisson_distribution<unsigned> poiss(lambda);
-  std::uniform_int_distribution<unsigned> unif(0, n-1);
-  std::vector<unsigned> ret(n_trials);
-  for (unsigned i = 0; i < n_trials; ++i) {
-    unsigned n_strings = poiss(generator);
-    unsigned val = 0;
-    for (unsigned j = 0; j < n_strings; ++j) {
-      val = val | (1 << unif(generator));
-    }
-    ret[i] = val;
-  }
-  return ret;
-}*/
 
 struct OccurrenceCounter {
   unsigned bernoulli_occurrences = 0;
@@ -249,8 +171,89 @@ TimingStats test_non_hybrid(unsigned n_trials, unsigned len, double p, unsigned 
   return ret;
 }
 
+TimingStats run_percolation(unsigned n_trials, unsigned len, double p, unsigned seed=DEF_SEED, unsigned t_max=10000) {
+  std::mt19937 generator;
+  generator.seed(seed);
+
+  TimingStats ret;
+
+  PercolationTracker<BinomialShufflePrecompute> perc_bin(n_trials, p, len, t_max);
+
+  auto begin = std::chrono::high_resolution_clock::now();
+  for (_uint i = 0; i < t_max; ++i) {
+    perc_bin.update(generator);
+  }
+  auto end = std::chrono::high_resolution_clock::now();
+  ret.binomial_new_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
+  ret.binomial_new_avg = (double)ret.binomial_new_total / n_trials;
+
+  std::vector<double> time = perc_bin.get_time_arr();
+  std::vector<double> occupation = perc_bin.get_occupation_n_arr();
+  std::vector<double> rho = perc_bin.get_rho_arr();
+  std::vector<_uint> survivors = perc_bin.get_n_survivors();
+  _uint n = time.size();
+
+  double* ln_time = new double[n];
+  double* ln_occ = new double[n];
+  double* ln_rho = new double[n];
+  std::vector<double> occ_fitted(n);
+  std::vector<double> rho_fitted(n);
+
+  double theta_fit, theta_cov, theta_sumsq_res, theta_r2, occ_mean, occ_ss;
+  double beta_fit, beta_cov, beta_sumsq_res, beta_r2, rho_mean, rho_ss;
+  std::ofstream dout;
+  dout.open("occupations.csv");
+  dout << "time,n(t),rho(t),n_surviving\n";
+  for (_uint i = 0; i < n; ++i) {
+    ln_time[i] = (time[i] <= 0)? 0 : log(time[i]);
+    ln_occ[i] = log(occupation[i]);
+    ln_rho[i] = log(rho[i]);
+    occ_mean += ln_occ[i] / n;
+    rho_mean += ln_rho[i] / n;
+    dout << i << "," << occupation[i] << "," << rho[i] << "," << survivors[i] << std::endl;
+  }
+
+  gsl_fit_mul(ln_time, 1, ln_occ, 1, time.size(), &theta_fit, &theta_cov, &theta_sumsq_res);
+  gsl_fit_mul(ln_time, 1, ln_rho, 1, time.size(), &beta_fit, &beta_cov, &beta_sumsq_res);
+
+  for (_uint i = 0; i < n; ++i) {
+    occ_ss += pow(ln_occ[i] - occ_mean, 2);
+    rho_ss += pow(ln_rho[i] - rho_mean, 2);
+    occ_fitted[i] = pow(time[i], theta_fit);
+    rho_fitted[i] = pow(time[i], beta_fit);
+  }
+  theta_r2 = 1 - theta_sumsq_res/occ_ss;
+  beta_r2 = 1 - beta_sumsq_res/rho_ss;
+
+  std::cout << "data\t| power law\t| std_dev\t| R^2\t|R^2 (adjusted)\n"
+	    << "n(t)\t| " << theta_fit << "\t| " << sqrt(theta_cov) << "\t| " << theta_r2 << "\t| " << (1-(1-theta_r2)*(n-1)/(n-2)) << "\n"
+	    << "rho(t)\t| " << beta_fit << "\t| " << sqrt(beta_cov) << "\t| " << beta_r2 << "\t| " << (1-(1-beta_r2)*(n-1)/(n-2)) << "\n";
+
+  plt::loglog(time, rho);
+  plt::loglog(time, rho_fitted);
+  plt::title("Average occupation density vs time");
+  plt::xlabel("time step");
+  plt::ylabel("rho(t)");
+  plt::save("rho.png");
+  plt::clf();
+
+  plt::loglog(time, occupation);
+  plt::loglog(time, occ_fitted);
+  plt::title("Average occupation number vs time");
+  plt::xlabel("time step");
+  plt::ylabel("n(t)");
+  plt::save("occ.png");
+  plt::clf();
+  delete[] ln_time;
+  delete[] ln_occ;
+  delete[] ln_rho;
+
+  return ret;
+}
+
 int main(int argc, char** argv) {
   unsigned n_trials = NUM_TRIALS;
+  unsigned n_steps = NUM_STEPS;
   unsigned len = DEF_LEN;
   unsigned seed = DEF_SEED;
   double p = PROBABILITY;
@@ -279,6 +282,10 @@ int main(int argc, char** argv) {
       seed = atoi(argv[i+1]);
       i++;
     }
+    if (strcmp(argv[i], "-t") == 0 && i != argc - 1) {
+      n_steps = atoi(argv[i+1]);
+      i++;
+    }
     if (strcmp(argv[i], "-q") == 0) {
       silent = true;
     }
@@ -304,28 +311,31 @@ int main(int argc, char** argv) {
   unsigned int binTest[UCHAR_MAX] = {};
   unsigned int binTest2[UCHAR_MAX] = {};*/
 
+  TimingStats timings;
   if (dist_test) {
-    TimingStats timings = test_non_hybrid(n_trials, len, p);
-    if (silent) {
-      std::cout << timings.bernoulli_total  << " " << timings.bernoulli_avg
-                << " " << timings.poisson_total << " " << timings.poisson_avg
-                << " " << timings.binomial_old_total << " " << timings.binomial_old_avg
-                << " " << timings.binomial_new_total << " " << timings.binomial_new_avg
-                << " " << timings.hybrid_poisson_total << " " << timings.hybrid_poisson_avg 
-                << " " << timings.hybrid_binomial_total << " " << timings.hybrid_binomial_avg << std::endl;
-    } else {
-      std::cout << "Bernoulli time:       " << timings.bernoulli_total
-                << " \tavg: " << timings.bernoulli_avg << std::endl
-                << "poisson time:         " << timings.poisson_total
-                << " \tavg: " << timings.poisson_avg << std::endl
-                << "binomial time (old):  " << timings.binomial_old_total
-                << " \tavg: " << timings.binomial_old_avg << std::endl
-                << "binomial time (new):  " << timings.binomial_new_total
-                << " \tavg: " << timings.binomial_new_avg << std::endl
-                << "hybrid poisson time:  " << timings.hybrid_poisson_total
-                << " \tavg: " << timings.hybrid_poisson_avg << std::endl
-                << "hybrid binomial time: " << timings.hybrid_binomial_total
-                << " \tavg: " << timings.hybrid_binomial_avg << std::endl;
-    }
+    timings = test_non_hybrid(n_trials, len, p);
+  } else {
+    timings = run_percolation(n_trials, len, p, seed, n_steps);
+  }
+  if (silent) {
+    std::cout << timings.bernoulli_total  << " " << timings.bernoulli_avg
+	      << " " << timings.poisson_total << " " << timings.poisson_avg
+	      << " " << timings.binomial_old_total << " " << timings.binomial_old_avg
+	      << " " << timings.binomial_new_total << " " << timings.binomial_new_avg
+	      << " " << timings.hybrid_poisson_total << " " << timings.hybrid_poisson_avg 
+	      << " " << timings.hybrid_binomial_total << " " << timings.hybrid_binomial_avg << std::endl;
+  } else {
+    std::cout << "Bernoulli time:       " << timings.bernoulli_total
+	      << " \tavg: " << timings.bernoulli_avg << std::endl
+	      << "poisson time:         " << timings.poisson_total
+	      << " \tavg: " << timings.poisson_avg << std::endl
+	      << "binomial time (old):  " << timings.binomial_old_total
+	      << " \tavg: " << timings.binomial_old_avg << std::endl
+	      << "binomial time (new):  " << timings.binomial_new_total
+	      << " \tavg: " << timings.binomial_new_avg << std::endl
+	      << "hybrid poisson time:  " << timings.hybrid_poisson_total
+	      << " \tavg: " << timings.hybrid_poisson_avg << std::endl
+	      << "hybrid binomial time: " << timings.hybrid_binomial_total
+	      << " \tavg: " << timings.hybrid_binomial_avg << std::endl;
   }
 }

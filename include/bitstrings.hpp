@@ -1,3 +1,6 @@
+#ifndef BITSTRINGS_H
+#define BITSTRINGS_H
+
 #include <random>
 #include <iostream>
 #include <math.h>
@@ -268,6 +271,9 @@ public:
 //binomial shuffler using 2 rv generation
 class BinomialShufflePrecompute {
 private:
+  double prob_1 = 0.0;
+  _uint n_samples = 0;
+
   _uint n_;
   double p_;
   std::binomial_distribution<_uint> bin;
@@ -317,8 +323,8 @@ public:
     n_ = n;
     p_ = p;
     //n_bytes = (n + (byte_size-1))/n;
-    //for large bitstrings, it is helpful to chunk results
-    mask = (1 << n_) - 1;
+    //for large bitstrings, it is helpful to chunk results, this mask contains n_ one bits and is safe for n_=<word size>
+    mask = ( ((_uint)1 << (n_-1)) - 1 ) | ( (_uint)1 << (n_-1) );
     n_groups = (n + (group_size-1))/group_size;
     
     if (n > group_size) {
@@ -330,7 +336,7 @@ public:
     
     if (p > 0.5) {
       p_ = 1 - p;
-      invert = (1 << n_) - 1;
+      invert = mask;
       bin = std::binomial_distribution<_uint>(n, p_);
     } else {
       p_ = p;
@@ -371,6 +377,23 @@ public:
         }
       }
     }
+    if ( 1 & (invert ^ result) ) {
+      prob_1 = (prob_1*(double)n_samples + 1.0)/(n_samples+1);
+    } else {
+      prob_1 = prob_1*(double)n_samples / (n_samples+1);
+    }
+    ++n_samples;
+    if ( (1 << (n_-1)) & (invert ^ result) ) {
+      prob_1 = (prob_1*(double)n_samples + 1.0)/(n_samples+1);
+    } else {
+      prob_1 = prob_1*(double)n_samples / (n_samples+1);
+    }
+    ++n_samples;
+    if (n_samples % 10000 == 0) {
+      std::cout << "prob_" << n_samples << ":" << prob_1 << std::endl;
+    }
     return mask & (invert ^ result);
   }
 };
+
+#endif //BITSTRINGS_H
