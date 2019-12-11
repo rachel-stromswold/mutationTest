@@ -53,9 +53,10 @@ TimingStats test_non_hybrid(unsigned n_trials, unsigned len, double p, unsigned 
   BinomialShuffleOld bin_old(len, p);
   BinomialShufflePrecompute bin_new(len, p);
   PoissonOr poisson(len, p);
-  FiniteDigit digit(len, p);
-  BinomialShufflePrecompute bin_correction(len, digit.get_correction());
-  PoissonOr poi_correction(len, digit.get_correction());
+  FiniteDigit<BinomialShufflePrecompute> digit_bin(len, p);
+  FiniteDigit<PoissonOr> digit_poi(len, p);
+  /*BinomialShufflePrecompute bin_correction(len, digit.get_correction());
+  PoissonOr poi_correction(len, digit.get_correction());*/
   //initialize the data storage
   std::vector<unsigned int> ber_test(n_trials);
   std::vector<unsigned int> poisson_test(n_trials);
@@ -95,7 +96,7 @@ TimingStats test_non_hybrid(unsigned n_trials, unsigned len, double p, unsigned 
   end = std::chrono::high_resolution_clock::now();
   ret.binomial_new_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
 
-  if (digit.get_correction() == 0) {
+  /*if (digit.get_correction() == 0) {
     begin = std::chrono::high_resolution_clock::now();
     for (unsigned i = 0; i < n_trials; ++i) {
       digit_test[i] = digit(generator);
@@ -103,12 +104,12 @@ TimingStats test_non_hybrid(unsigned n_trials, unsigned len, double p, unsigned 
     end = std::chrono::high_resolution_clock::now();
     ret.hybrid_poisson_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
     ret.hybrid_binomial_total = ret.hybrid_poisson_total;
-  } else {
+  } else {*/
     //initialize the clock for the finite digit method (poisson correction)
     begin = std::chrono::high_resolution_clock::now();
     for (unsigned i = 0; i < n_trials; ++i) {
-      digit_test[i] = digit(generator);
-      digit_test[i] |= poi_correction(generator);
+      digit_test[i] = digit_poi(generator);
+      //digit_test[i] |= poi_correction(generator);
     }
     end = std::chrono::high_resolution_clock::now();
     ret.hybrid_poisson_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
@@ -116,12 +117,12 @@ TimingStats test_non_hybrid(unsigned n_trials, unsigned len, double p, unsigned 
     //initialize the clock for the finite digit method (new binomial correction)
     begin = std::chrono::high_resolution_clock::now();
     for (unsigned i = 0; i < n_trials; ++i) {
-      digit_test[i] = digit(generator);
-      digit_test[i] |= bin_correction(generator);
+      digit_test[i] = digit_bin(generator);
+      //digit_test[i] |= bin_correction(generator);
     }
     end = std::chrono::high_resolution_clock::now();
     ret.hybrid_binomial_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
-  }
+  //}
 
   std::ofstream dout;
   dout.open("dat.csv");
@@ -177,7 +178,7 @@ TimingStats run_percolation(unsigned n_trials, unsigned len, double p, unsigned 
 
   TimingStats ret;
 
-  PercolationTracker<BinomialShufflePrecompute> perc_bin(n_trials, p, len, t_max);
+  PercolationTracker<FiniteDigit<BinomialShufflePrecompute>> perc_bin(n_trials, p, len, t_max);
 
   _uint interval = 500;
   std::cout << "v";

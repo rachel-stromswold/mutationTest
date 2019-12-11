@@ -24,6 +24,7 @@ private:
 public:
   DirectedPercolator1(double p_p, _uint pt_max, _uint p_string_size=32) : bitstring(pt_max + 1, 0) {
     t_max = pt_max;
+    steady_state_t = t_max;
     string_size = p_string_size;
     last_bit = 1 << (string_size - 1);
     /*bitstrings.resize(t_max);
@@ -49,21 +50,21 @@ public:
       _uint l_bonds;
       _uint r_bonds;
       for (_uint i = 0; i < n_strings; ++i) {
-	//handle carryover
-	if (i > 0 && (old_bitstring[i-1] & last_bit) > 0) {
-	  if ((l_bonds & last_bit) > 0) {
-	    bitstring[i] = 1;
-	  } else {
-	    bitstring[i] = 0;
-	  }
-	} else {
-	  bitstring[i] = 0;
-	}
-	//perform updates
-	_uint l_bonds = s(g);
+        //handle carryover
+        if (i > 0 && (old_bitstring[i-1] & last_bit) > 0) {
+          if ((l_bonds & last_bit) > 0) {
+            bitstring[i] = 1;
+          } else {
+            bitstring[i] = 0;
+          }
+        } else {
+          bitstring[i] = 0;
+        }
+        //perform updates
+        _uint l_bonds = s(g);
         _uint r_bonds = s(g);
 
-	bitstring[i] |= (old_bitstring[i] & r_bonds) | ( (old_bitstring[i] & l_bonds) << 1 );
+        bitstring[i] |= (old_bitstring[i] & r_bonds) | ( (old_bitstring[i] & l_bonds) << 1 );
         if (bitstring[i] != 0) { all_zeros = false; }
       }
       if (all_zeros) {

@@ -62,60 +62,6 @@ public:
   }
 };
 
-class FiniteDigit {
-private:
-  _uint n_;
-  double p_;
-  std::vector<bool> binary_rep;
-
-public:
-  FiniteDigit(_uint n, double p, _uint accuracy=3) : binary_rep(accuracy) {
-    n_ = n;
-    p_ = p;
-    for (_uint i = 0; i < binary_rep.size(); ++i) {
-      if (p >= 0.5) {
-        binary_rep[i] = 1;
-        p = p*2 - 1;
-      } else {
-        binary_rep[i] = 0;
-        p = p*2;
-      }
-    }
-    while (binary_rep.size() > 0 && binary_rep[binary_rep.size()-1] == 0) {
-      binary_rep.pop_back();
-    }
-  }
-  double get_correction() {
-    double actual_p = 0;
-    for (_uint i = 0; i < binary_rep.size(); ++i) {
-      if (binary_rep[i]) {
-        actual_p += 0.5/((double)(1 << i));
-      }
-    }
-    if (actual_p == 1) { return 0; }
-    return (p_ - actual_p)/(1 - actual_p);
-  }
-  
-  template <class Generator>
-  _uint operator()(Generator& g) {
-    _uint val = 0;
-
-    std::uniform_int_distribution<_uint> unif(0, (1 << n_)-1);
-    //std::cout << val;
-    for (int i = binary_rep.size()-1; i >= 0; --i) {
-      if (binary_rep[i]) {
-        val = val | unif(g);
-        //std::cout << " ored " << val;
-      } else {
-        val = val & unif(g);
-        //std::cout << " anded " << val;
-      }
-    }
-    //std::cout << std::endl;
-    return val;
-  }
-};
-
 //implementation found in Watanabe et al.
 class BinomialShuffleOld {
 private:
@@ -278,7 +224,7 @@ private:
   double p_;
   std::binomial_distribution<_uint> bin;
   std::vector<_uint> choose_vals;
-  const _uint group_size = 32;
+  _uint group_size = 32;
   _uint group_n = group_size;
   _uint n_groups = 1;
   //const _uint int byte_size = 8;
@@ -318,7 +264,6 @@ public:
   BinomialShufflePrecompute(_uint n, double p, double p_precompute_k=4) : choose_vals(n+1), bin(n, p), precompute_strings(p_precompute_k) {
     n_ = n;
     p_ = p;
-    //n_bytes = (n + (byte_size-1))/n;
     //for large bitstrings, it is helpful to chunk results, this mask contains n_ one bits and is safe for n_=<word size>
     mask = ( ((_uint)1 << (n_-1)) - 1 ) | ( (_uint)1 << (n_-1) );
     n_groups = (n + (group_size-1))/group_size;
@@ -356,12 +301,12 @@ public:
     for (_uint num_ones = precompute_k; num_ones < group_n; ++num_ones) {
       std::cout << "num_ones=" << num_ones << " N choose num_ones=" << choose_vals[num_ones] << std::endl;
       for (_uint i = 0; i < choose_vals[num_ones]; ++i) {
-	for (_uint j = i+1; j < choose_vals[num_ones]; ++j) {
-	  if ( get_bit_stream(group_n, num_ones, i, precompute_k-1) == get_bit_stream(group_n, num_ones, j, precompute_k-1) ) {
-	    std::cout << "\tfailure i=" << i << " j=" << j << std::endl;
-	    return false;
-	  }
-	}
+        for (_uint j = i+1; j < choose_vals[num_ones]; ++j) {
+          if ( get_bit_stream(group_n, num_ones, i, precompute_k-1) == get_bit_stream(group_n, num_ones, j, precompute_k-1) ) {
+            std::cout << "\tfailure i=" << i << " j=" << j << std::endl;
+            return false;
+          }
+        }
       }
     }
     return true;
@@ -405,6 +350,66 @@ public:
       std::cout << "prob_" << n_samples << ":" << prob_1 << std::endl;
     }*/
     return mask & (invert ^ result);
+  }
+};
+
+template <typename Correction=BinomialShufflePrecompute>
+class FiniteDigit {
+private:
+  _uint n_;
+  double p_;
+  std::vector<bool> binary_rep;
+  Correction c;
+  std::uniform_int_distribution<_uint> unif;
+
+public:
+  double get_correction() {
+    double actual_p = 0;
+    for (_uint i = 0; i < binary_rep.size(); ++i) {
+      if (binary_rep[i]) {
+        actual_p += 0.5/((double)(1 << i));
+      }
+    }
+    if (actual_p == 1) { return 0; }
+    return (p_ - actual_p)/(1 - actual_p);
+  }
+
+  FiniteDigit(_uint n, double p, _uint accuracy=3) : binary_rep(accuracy), c(n, p), unif(0, 0) {
+    n_ = n;
+    p_ = p;
+    for (_uint i = 0; i < binary_rep.size(); ++i) {
+      if (p >= 0.5) {
+        binary_rep[i] = 1;
+        p = p*2 - 1;
+      } else {
+        binary_rep[i] = 0;
+        p = p*2;
+      }
+    }
+    while (binary_rep.size() > 0 && binary_rep[binary_rep.size()-1] == 0) {
+      binary_rep.pop_back();
+    } 
+    c = Correction(n, get_correction());
+    _uint max_int = ( (_uint)1 << (n_-1) ) | ( ((_uint)1 << (n_-1)) - 1 );
+    unif = std::uniform_int_distribution<_uint>(0, max_int);
+  }
+  
+  template <class Generator>
+  _uint operator()(Generator& g) {
+    _uint val = 0;
+
+    //std::cout << val;
+    for (int i = binary_rep.size()-1; i >= 0; --i) {
+      if (binary_rep[i]) {
+        val = val | unif(g);
+        //std::cout << " ored " << val;
+      } else {
+        val = val & unif(g);
+        //std::cout << " anded " << val;
+      }
+    }
+    //std::cout << std::endl;
+    return val | c(g);
   }
 };
 
