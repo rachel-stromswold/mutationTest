@@ -22,7 +22,7 @@ private:
   }
 
 public:
-  DirectedPercolator1(double p_p, _uint pt_max, _uint p_string_size=32) : bitstring(pt_max + 1, 0) {
+  DirectedPercolator1(double p_p, _uint pt_max, bool relax, _uint p_string_size) : bitstring(pt_max + 1, 0) {
     t_max = pt_max;
     steady_state_t = t_max;
     string_size = p_string_size;
@@ -36,35 +36,44 @@ public:
       bitstrings[i].resize(n_strings);
     }
     bitstrings[0][0] = 1;*/
-    bitstring[0] = 1;
+    if (relax) {
+      for (_uint i = 0 ; i < bitstring.size(); ++i) {
+	//set everything to be the all ones state
+	bitstring[i] = last_bit | (last_bit-1);
+      }
+    } else {
+      bitstring[0] = 1;
+    }
   }
 
   template <typename Generator>
-  void update(Sampler& s, Generator& g) {
+  void update(Sampler& s, Generator& g, bool relax) {
+    _uint mask = last_bit | (last_bit - 1);
     ++t;
     std::vector<_uint> old_bitstring = bitstring;
     _uint n_strings = (t + string_size) / string_size;
+    std::vector<_uint> l_bonds(n_strings);
+    std::vector<_uint> r_bonds(n_strings);
     if (t < steady_state_t && t < t_max) {
       bool all_zeros = true;
 
-      _uint l_bonds;
-      _uint r_bonds;
       for (_uint i = 0; i < n_strings; ++i) {
-        //handle carryover
-        if (i > 0 && (old_bitstring[i-1] & last_bit) > 0) {
-          if ((l_bonds & last_bit) > 0) {
-            bitstring[i] = 1;
-          } else {
-            bitstring[i] = 0;
-          }
-        } else {
-          bitstring[i] = 0;
-        }
-        //perform updates
-        _uint l_bonds = s(g);
-        _uint r_bonds = s(g);
+	//handle carryover
+	if (i > 0 && (old_bitstring[i-1] & last_bit) > 0) {
+	  if ((l_bonds[i-1] & last_bit) > 0) {
+	    bitstring[i] = 1;
+	  } else {
+	    bitstring[i] = 0;
+	  }
+	} else {
+	  bitstring[i] = 0;
+	}
+	//perform updates
+	l_bonds[i] = s(g);
+	r_bonds[i] = s(g);
 
-        bitstring[i] |= (old_bitstring[i] & r_bonds) | ( (old_bitstring[i] & l_bonds) << 1 );
+	bitstring[i] |= (old_bitstring[i] & r_bonds[i]);
+	bitstring[i] |= ( (old_bitstring[i] & l_bonds[i]) << 1 ) & mask;
         if (bitstring[i] != 0) { all_zeros = false; }
       }
       if (all_zeros) {
@@ -74,12 +83,20 @@ public:
   }
 
   template <typename Generator>
-  void update_debug(Sampler& s, Generator& g) {
+  void update_debug(Sampler& s, Generator& g, bool relax) {
+    _uint mask = last_bit | (last_bit - 1);
     if (t == 0) {
-      for (_uint i = 0; i < t_max - (t+1); ++i) {
-	std::cout << " ";
+      if (relax) {
+	for (_uint i = 0; i < t_max; ++i) {
+	  std::cout << "1 ";
+	}
+	std::cout << "1\n";
+      } else {
+	for (_uint i = 0; i < t_max - (t+1); ++i) {
+	  std::cout << " ";
+	}
+	std::cout << "1\n";
       }
-      std::cout << "1\n";
     }
     ++t;
     std::vector<_uint> old_bitstring = bitstring;
@@ -106,19 +123,29 @@ public:
 	l_bonds[i] = s(g);
 	r_bonds[i] = s(g);
 
-	bitstring[i] |= (old_bitstring[i] & r_bonds[i]) | ( (old_bitstring[i] & l_bonds[i]) << 1 );
+	bitstring[i] |= (old_bitstring[i] & r_bonds[i]);
+	bitstring[i] |= ( (old_bitstring[i] & l_bonds[i]) << 1 ) & mask;
         if (bitstring[i] != 0) { all_zeros = false; }
+	std::cout << bitstring[i] << " ";
       }
+      std::cout << "\n";
       if (all_zeros) {
         steady_state_t = t;
       }
-      for (_uint i = 1; i < t_max - (t+1); ++i) {
-	std::cout << " ";
+      _uint old_t = t;
+      if (relax) {
+	t = t_max;
+      } else {
+	for (_uint i = 1; i < t_max - (t+1); ++i) {
+	  std::cout << " ";
+	}
       }
-      for (_uint i = 0; i < t; ++i) {
+
+      _uint status = 0;
+      for (_uint i = 0; i <= t; ++i) {
 	_uint ind = (t-i) / string_size;
 	_uint bit = (t-i) % string_size;
-	_uint status = ( 2 & (l_bonds[ind] >> (bit-1)) ) | ( 1 & (r_bonds[ind] >> bit) ) ;
+	status = ( 2 & (l_bonds[ind] >> (bit-1)) ) | ( 1 & (r_bonds[ind] >> bit) ) ;
 	if ( ((old_bitstring[ind] >> bit) & 1) != 0 && i < t) {
 	  if (status == 0) {
 	    std::cout << " ";
@@ -132,10 +159,24 @@ public:
 	} else {
 	  std::cout << " ";
 	}
-	std::cout << " ";
+	if (i < t) {
+	  std::cout << " ";
+	}
+      }
+      if (old_bitstring[0] & 1 != 0) {
+	status = (r_bonds[0] & 1) | ((l_bonds[0] & 1)<< 1);
+	if (status == 0) {
+	  std::cout << " ";
+	} else if (status == 1) {
+	  std::cout << "\\";
+	} else if (status == 2) {
+	  std::cout << "/";
+	} else {
+	  std::cout << "^";
+	}
       }
       std::cout << "\n";
-      for (_uint i = 0; i < t_max - (t+1); ++i) {
+      for (_uint i = 1; i < t_max - t; ++i) {
 	std::cout << " ";
       }
       for (_uint i = 0; i <= t; ++i) {
@@ -146,6 +187,7 @@ public:
 
       }
       std::cout << "\n";
+      t = old_t;
     }
   }
 
@@ -196,13 +238,17 @@ private:
   Sampler s;
   std::vector<DirectedPercolator1<Sampler>> percs;
   _uint string_size;
+  bool relax = false;
+  _uint t_max;
 
 public:
-  PercolationTracker(_uint n_samples, double p, _uint p_string_size=32, _uint pt_max=1000) :
+  PercolationTracker(_uint n_samples, double p, bool p_relax=false, _uint p_string_size=32, _uint pt_max=1000) :
   s(p_string_size, p),
   avg_occupation_n(1),
   avg_rho(1),
-  n_survivors(1) {
+  n_survivors(1),
+  relax(p_relax),
+  t_max(pt_max) {
     /*if (!s.bijectivity_test()) {
       std::cout << "ERROR\n";
     }*/
@@ -210,7 +256,7 @@ public:
 
     percs.reserve(n_samples);
     for (_uint i = 0; i < n_samples; ++i) {
-      percs.emplace_back(p, pt_max, string_size);
+      percs.emplace_back(p, pt_max, relax, string_size);
     }
     avg_occupation_n[0] = 1;
     avg_rho[0] = 1;
@@ -224,7 +270,7 @@ public:
     avg_rho.push_back(0);
     n_survivors.push_back(0);
     for (_uint i = 0; i < percs.size(); ++i) {
-      percs[i].update(s, g);
+      percs[i].update(s, g, relax);
       //information for debugging
       /*std::vector<bool> status = percs[i].get_state();
       for(_uint j = 0; j < status.size(); ++j) {
@@ -232,7 +278,11 @@ public:
       }
       std::cout << std::endl;*/
       avg_occupation_n[t] += (double)(percs[i].get_n_t()) / percs.size();
-      avg_rho[t] += percs[i].get_rho_t() / percs.size();
+      if (relax) {
+	avg_rho[t] += (double)(percs[i].get_n_t()) / (percs.size()*t_max);
+      } else {
+	avg_rho[t] += percs[i].get_rho_t() / percs.size();
+      }
       if (percs[i].alive()) {
 	++n_survivors[t];
       }
@@ -248,7 +298,11 @@ public:
   }
   std::vector<double> get_occupation_n_arr() { return avg_occupation_n; }
   std::vector<double> get_rho_arr() { return avg_rho; }
-  std::vector<_uint> get_n_survivors() { return n_survivors; }
+  std::vector<_uint> get_survivors_arr() { return n_survivors; }
+
+  double get_n(_uint t) { return avg_occupation_n[t]; }
+  double get_rho(_uint t) { return avg_rho[t]; }
+  double get_survivors(_uint t) { return n_survivors[t]; }
 };
 
 #endif //PERCOLATION_H

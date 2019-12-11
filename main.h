@@ -2,7 +2,6 @@
 #define MAIN_H
 
 //#include "include/bitstrings.hpp"
-//#include "matplotlib-cpp/matplotlibcpp.h"
 #include "include/percolation.hpp"
 #include <gsl/gsl_fit.h>
 #include <map>
@@ -16,6 +15,7 @@
 #define NUM_STEPS	32768
 #define PROBABILITY	0.01
 #define COL_WIDTH	80
+#define INTERVAL	500
 
 #define N_STARS		200
 

@@ -5,9 +5,12 @@ import csv
 import random
 
 fname = sys.argv[1]
-discard = 100
+discard = 1
+span = 1
 if len(sys.argv) > 2:
-    discard = int(sys.argv[2])
+    span = int(sys.argv[2])
+if len(sys.argv) > 3:
+    discard = int(sys.argv[3])
 
 '''n_samples = 100
 t_max = 10000
@@ -34,12 +37,15 @@ rho = []
 n = 0
 with open(fname) as csvfile:
     read = csv.reader(csvfile)
+    k = 0
     for row in read:
         if row[0] != "time":
-            time.append(float(row[0]))
-            occ.append(float(row[1]))
-            rho.append(float(row[2]))
-            n += 1
+            if (k % 2 == 0):
+                time.append(float(row[0]))
+                occ.append(float(row[1]))
+                rho.append(float(row[2]))
+                n += 1
+            k += 1
 
 #ln_test_time = np.log(np.arange(t_max))
 #ln_test_time = ln_time[:,np.newaxis]
@@ -71,6 +77,8 @@ plt.loglog(time, rho_fitted);
 plt.title("Average occupation density vs time");
 plt.xlabel("time step");
 plt.ylabel("rho(t)");
+plt.xlim([1.0, 110.0])
+plt.ylim([0.0001, 1.5])
 plt.show("rho.png");
 plt.clf();
 
@@ -79,6 +87,8 @@ plt.loglog(time, occ_fitted);
 plt.title("Average occupation number vs time");
 plt.xlabel("time step");
 plt.ylabel("n(t)");
+plt.xlim([1.0, 110.0])
+plt.ylim([0.0001, 50])
 plt.show("occ.png");
 
 '''plt.loglog(test_time, test_occ);

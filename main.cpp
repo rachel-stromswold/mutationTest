@@ -172,36 +172,136 @@ TimingStats test_non_hybrid(unsigned n_trials, unsigned len, double p, unsigned 
   return ret;
 }
 
-TimingStats run_percolation(unsigned n_trials, unsigned len, double p, unsigned seed=DEF_SEED, unsigned t_max=10000) {
+TimingStats run_percolation(unsigned n_trials, unsigned len, double p, bool relax, unsigned t_max=10000, unsigned seed=DEF_SEED) {
   std::mt19937 generator;
   generator.seed(seed);
 
   TimingStats ret;
 
-  PercolationTracker<FiniteDigit<BinomialShufflePrecompute>> perc_bin(n_trials, p, len, t_max);
+  unsigned bernoulli_total = 0;
+  unsigned poisson_total = 0;
+  unsigned binomial_old_total = 0;
+  unsigned binomial_new_total = 0;
+  double hybrid_poisson_total = 0;
+  double hybrid_binomial_total = 0;
+
+  PercolationTracker<RepeatBernoulli> perc_bern(n_trials, p, relax, len, t_max);
+  PercolationTracker<PoissonOr> perc_pois(n_trials, p, relax, len, t_max);
+  PercolationTracker<BinomialShuffleOld> perc_bin_old(n_trials, p, relax, len, t_max);
+  PercolationTracker<BinomialShufflePrecompute> perc_bin_new(n_trials, p, relax, len, t_max);
+  PercolationTracker<FiniteDigit<PoissonOr>> perc_hyp(n_trials, p, relax, len, t_max);
+  PercolationTracker<FiniteDigit<BinomialShufflePrecompute>> perc_hyb(n_trials, p, relax, len, t_max);
 
   _uint interval = 500;
-  std::cout << "v";
-  for (_uint i = 0; i < t_max/interval; ++i) {
+  std::cout << "Now running bernoulli test\nv";
+  for (_uint i = 0; i < t_max/INTERVAL; ++i) {
     std::cout << " ";
   }
   std::cout << "v\n ";
   auto begin = std::chrono::high_resolution_clock::now();
   for (_uint i = 0; i < t_max; ++i) {
-    perc_bin.update(generator);
-    if (i % interval == 0) {
+    perc_bern.update(generator);
+    if (i % INTERVAL == 0) {
       std::cout << "#" << std::flush;
     }
   }
   auto end = std::chrono::high_resolution_clock::now();
+  ret.bernoulli_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
   std::cout << "\n";
-  ret.binomial_new_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
-  ret.binomial_new_avg = (double)ret.binomial_new_total / n_trials;
 
-  std::vector<double> time = perc_bin.get_time_arr();
-  std::vector<double> occupation = perc_bin.get_occupation_n_arr();
-  std::vector<double> rho = perc_bin.get_rho_arr();
-  std::vector<_uint> survivors = perc_bin.get_n_survivors();
+  std::cout << "Now running poisson test\nv";
+  for (_uint i = 0; i < t_max/INTERVAL; ++i) {
+    std::cout << " ";
+  }
+  std::cout << "v\n ";
+  begin = std::chrono::high_resolution_clock::now();
+  for (_uint i = 0; i < t_max; ++i) {
+    perc_pois.update(generator);
+    if (i % INTERVAL == 0) {
+      std::cout << "#" << std::flush;
+    }
+  }
+  end = std::chrono::high_resolution_clock::now();
+  ret.poisson_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
+  std::cout << "\n";
+
+  std::cout << "Now running old-binomial test\nv";
+  for (_uint i = 0; i < t_max/INTERVAL; ++i) {
+    std::cout << " ";
+  }
+  std::cout << "v\n ";
+  begin = std::chrono::high_resolution_clock::now();
+  for (_uint i = 0; i < t_max; ++i) {
+    perc_bin_old.update(generator);
+    if (i % INTERVAL == 0) {
+      std::cout << "#" << std::flush;
+    }
+  }
+  end = std::chrono::high_resolution_clock::now();
+  ret.binomial_old_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
+
+  std::cout << "Now running new-binomial test\nv";
+  for (_uint i = 0; i < t_max/INTERVAL; ++i) {
+    std::cout << " ";
+  }
+  std::cout << "v\n ";
+  begin = std::chrono::high_resolution_clock::now();
+  for (_uint i = 0; i < t_max; ++i) {
+    perc_bin_new.update(generator);
+    if (i % INTERVAL == 0) {
+      std::cout << "#" << std::flush;
+    }
+  }
+  end = std::chrono::high_resolution_clock::now();
+  ret.binomial_new_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
+
+  std::cout << "Now running poisson finite digit test\nv";
+  for (_uint i = 0; i < t_max/INTERVAL; ++i) {
+    std::cout << " ";
+  }
+  std::cout << "v\n ";
+  begin = std::chrono::high_resolution_clock::now();
+  for (_uint i = 0; i < t_max; ++i) {
+    perc_hyp.update(generator);
+    if (i % INTERVAL == 0) {
+      std::cout << "#" << std::flush;
+    }
+  }
+  end = std::chrono::high_resolution_clock::now();
+  ret.hybrid_poisson_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
+  std::cout << "\n";
+
+  std::cout << "Now running binomial finite digit test\nv";
+  for (_uint i = 0; i < t_max/INTERVAL; ++i) {
+    std::cout << " ";
+  }
+  std::cout << "v\n ";
+  begin = std::chrono::high_resolution_clock::now();
+  for (_uint i = 0; i < t_max; ++i) {
+    perc_hyb.update(generator);
+    if (i % INTERVAL == 0) {
+      std::cout << "#" << std::flush;
+    }
+  }
+  end = std::chrono::high_resolution_clock::now();
+  ret.hybrid_binomial_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
+  std::cout << "\n";
+
+
+  ret.bernoulli_avg = (double)ret.bernoulli_total / n_trials;
+  ret.poisson_avg = (double)ret.poisson_total / n_trials;
+  ret.binomial_old_avg = (double)ret.binomial_old_total / n_trials;
+  ret.binomial_new_avg = (double)ret.binomial_new_total / n_trials;
+  ret.hybrid_poisson_avg = (double)ret.hybrid_poisson_total / n_trials;
+  ret.hybrid_binomial_avg = (double)ret.hybrid_binomial_total / n_trials;
+
+  std::vector<double> time = perc_bern.get_time_arr();
+  /*std::vector<double> bern_occupation = perc_bern.get_occupation_n_arr();
+  std::vector<double> bern_rho = perc_bern.get_rho_arr();
+  std::vector<_uint> bern_survivors = perc_bern.get_n_survivors();
+  std::vector<double> bin_occupation = perc_bern.get_occupation_n_arr();
+  std::vector<double> bin_rho = perc_bern.get_rho_arr();
+  std::vector<_uint> bern_survivors = perc_bern.get_n_survivors();*/
   _uint n = time.size();
 
   double* ln_time = new double[n];
@@ -215,13 +315,25 @@ TimingStats run_percolation(unsigned n_trials, unsigned len, double p, unsigned 
   std::ofstream dout;
   dout.open("occupations.csv");
   dout << "time,n(t),rho(t),n_surviving\n";
-  for (_uint i = 0; i < n; ++i) {
-    ln_time[i] = (time[i] <= 0)? 0 : log(time[i]);
-    ln_occ[i] = log(occupation[i]);
-    ln_rho[i] = log(rho[i]);
-    occ_mean += ln_occ[i] / n;
-    rho_mean += ln_rho[i] / n;
-    dout << i << "," << occupation[i] << "," << rho[i] << "," << survivors[i] << std::endl;
+  for (_uint t = 0; t < n; ++t) {
+    double avg_n = ( perc_bern.get_n(t) + perc_pois.get_n(t) + perc_bin_old.get_n(t) + perc_bin_new.get_n(t) + perc_hyp.get_n(t) + perc_hyb.get_n(t) ) / 6;
+    double avg_rho = ( perc_bern.get_rho(t) + perc_pois.get_rho(t) + perc_bin_old.get_rho(t) + perc_bin_new.get_rho(t) + perc_hyp.get_rho(t) + perc_hyb.get_rho(t) ) / 6;
+    double avg_survivors = ( perc_bern.get_survivors(t) + perc_pois.get_survivors(t) + perc_bin_old.get_survivors(t) + perc_bin_new.get_survivors(t) + perc_hyp.get_survivors(t) + perc_hyb.get_survivors(t) ) / 6;
+
+    ln_time[t] = (time[t] <= 0)? 0 : log(time[t]);
+    ln_occ[t] = log(avg_n);
+    ln_rho[t] = log(avg_rho);
+    occ_mean += ln_occ[t] / n;
+    rho_mean += ln_rho[t] / n;
+    dout << t << ","
+         << avg_n << "," << avg_rho << "," << avg_survivors << ","
+         << perc_bern.get_n(t) << "," << perc_bern.get_rho(t) << "," << perc_bern.get_survivors(t) << ","
+	 << perc_pois.get_n(t) << "," << perc_pois.get_rho(t) << "," << perc_pois.get_survivors(t) << ","
+	 << perc_bin_old.get_n(t) << "," << perc_bin_old.get_rho(t) << "," << perc_bin_old.get_survivors(t) << ","
+	 << perc_bin_new.get_n(t) << "," << perc_bin_new.get_rho(t) << "," << perc_bin_new.get_survivors(t) << ","
+	 << perc_hyp.get_n(t) << "," << perc_hyp.get_rho(t) << "," << perc_hyp.get_survivors(t) << ","
+	 << perc_hyb.get_n(t) << "," << perc_hyb.get_rho(t) << "," << perc_hyb.get_survivors(t) << ","
+	 << std::endl;
   }
 
   gsl_fit_mul(ln_time, 1, ln_occ, 1, time.size(), &theta_fit, &theta_cov, &theta_sumsq_res);
@@ -240,21 +352,6 @@ TimingStats run_percolation(unsigned n_trials, unsigned len, double p, unsigned 
 	    << "n(t)\t| " << theta_fit << "\t| " << sqrt(theta_cov) << "\t| " << theta_r2 << "\t| " << (1-(1-theta_r2)*(n-1)/(n-2)) << "\n"
 	    << "rho(t)\t| " << beta_fit << "\t| " << sqrt(beta_cov) << "\t| " << beta_r2 << "\t| " << (1-(1-beta_r2)*(n-1)/(n-2)) << "\n";
 
-  /*plt::loglog(time, rho);
-  plt::loglog(time, rho_fitted);
-  plt::title("Average occupation density vs time");
-  plt::xlabel("time step");
-  plt::ylabel("rho(t)");
-  plt::save("rho.png");
-  plt::clf();
-
-  plt::loglog(time, occupation);
-  plt::loglog(time, occ_fitted);
-  plt::title("Average occupation number vs time");
-  plt::xlabel("time step");
-  plt::ylabel("n(t)");
-  plt::save("occ.png");
-  plt::clf();*/
   delete[] ln_time;
   delete[] ln_occ;
   delete[] ln_rho;
@@ -270,6 +367,7 @@ int main(int argc, char** argv) {
   double p = PROBABILITY;
   bool silent = false;
   bool dist_test = false;
+  bool relax = false;
 
   //parse input arguments
   for (int i = 1; i < argc; ++i) {
@@ -303,6 +401,9 @@ int main(int argc, char** argv) {
     if (strcmp(argv[i], "-d") == 0) {
       dist_test = true;
     }
+    if (strcmp(argv[i], "-r") == 0 && i != argc - 1) {
+      relax = true;
+    }
   }
 
   if (!silent) {
@@ -326,7 +427,7 @@ int main(int argc, char** argv) {
   if (dist_test) {
     timings = test_non_hybrid(n_trials, len, p);
   } else {
-    timings = run_percolation(n_trials, len, p, seed, n_steps);
+    timings = run_percolation(n_trials, len, p, relax, n_steps, seed);
   }
   if (silent) {
     std::cout << timings.bernoulli_total  << " " << timings.bernoulli_avg

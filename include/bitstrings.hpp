@@ -1,9 +1,11 @@
 #ifndef BITSTRINGS_H
 #define BITSTRINGS_H
 
+#include "../uint128_t/uint128_t.h"
 #include <random>
 #include <iostream>
 #include <math.h>
+#include <limits.h>
 
 typedef size_t _uint;
 
@@ -32,6 +34,44 @@ _uint get_bit_stream_slow(_uint n, _uint k, _uint x) {
     return get_bit_stream_slow( n-1, k, x-choose(n-1, k-1) ) << 1;
   }
 }
+
+//generates uniformly distributed random inegers in the range [a, b)
+template <typename _int=_uint>
+class UniformInt {
+private:
+  _int a, b;//s = a-b
+  uint128_t s;
+  std::uniform_int_distribution<_int> unif;
+  _int max_rep;
+  _uint n_bits;
+  uint128_t max;
+
+public:
+  UniformInt(_int p_a, _int p_b) : a(p_a), b(p_b) {
+    s = b-a;
+    n_bits = sizeof(_int)*CHAR_BIT;
+    max_rep = (1 << (n_bits-1)) | ( (1 << (n_bits-1))-1 );
+    max = max_rep;
+    max += 1;
+    unif = std::uniform_int_distribution<_int>(0, max_rep);
+  }
+
+  template <class Generator>
+  _uint operator()(Generator& g) {
+    uint128_t x = unif(g);
+    uint128_t m = x*s;
+    _uint l = m & max_rep; //eq to _uint l = m % max;
+    if (l < s) {
+      uint128_t t = (max - s) % s;
+      while (l < t) {
+	x = unif(g);
+	m = x*s;
+	l = m & max_rep;
+      }
+    }
+    return m >> n_bits;
+  }
+};
 
 class RepeatBernoulli {
 private:
@@ -75,7 +115,7 @@ public:
     n_ = n;
     if (p > 0.5) {
       p_ = 1 - p;
-      invert = (1 << n) - 1;
+      invert = (1 << (n-1)) | ((1 << (n-1)) - 1);
       bin = std::binomial_distribution<_uint>(n, p_);
     } else {
       p_ = p;
@@ -93,6 +133,7 @@ public:
 
     for (_uint j = n_ - num_ones; j < n_; ++j) {
       std::uniform_int_distribution<_uint> unif(0, j);
+      //UniformInt<_uint> unif(0, j+1);
       _uint t = 1 << unif(g);
       if ((val & t) != 0) {
         val = val | (1 << j);
@@ -112,16 +153,18 @@ private:
   double lambda;
   std::poisson_distribution<_uint> poiss;
   std::uniform_int_distribution<_uint> unif;
+  //UniformInt<_uint> unif;
   _uint inversion_layer;
   _uint invert = 0;
 
 public:
-  PoissonOr(_uint n, double p) : unif(0, n-1) {
+  //PoissonOr(_uint n, double p) : unif(0, n-1) {
+  PoissonOr(_uint n, double p) : unif(0, n) {
     n_ = n;
     p_ = p;
     if (p > 0.5) {
       p = 1 - p;
-      invert = (1 << n) - 1;
+      invert = (1 << (n-1)) | ((1 << (n-1))-1);
     }
     lambda = -(double)n*log(1-p);
     poiss = std::poisson_distribution<_uint>(lambda);
@@ -209,6 +252,7 @@ public:
     }
     //minus 1 because we start indexing from 0
     std::uniform_int_distribution<_uint> unif(0, choose_vals[num_ones] - 1);
+    //UniformInt<_uint> unif(0, choose_vals[num_ones]);
     _uint bin_val = get_bit_stream(n_, num_ones, unif(g));
     return invert ^ bin_val;
   }
@@ -325,6 +369,7 @@ public:
       if (num_ones != 0) {
         //minus 1 because we start indexing from 0
         std::uniform_int_distribution<_uint> unif(0, choose_vals[num_ones] - 1);
+	//UniformInt<_uint> unif(0, choose_vals[num_ones]);
         _uint j = unif(g);
         if (num_ones < precompute_k) {
           result |= precompute_strings[num_ones][j] << (i*group_size);
