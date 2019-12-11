@@ -202,6 +202,9 @@ public:
   avg_occupation_n(1),
   avg_rho(1),
   n_survivors(1) {
+    /*if (!s.bijectivity_test()) {
+      std::cout << "ERROR\n";
+    }*/
     string_size = p_string_size;
 
     percs.reserve(n_samples);

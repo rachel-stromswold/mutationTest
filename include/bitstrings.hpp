@@ -308,10 +308,6 @@ private:
         chooseval /= n-i-1;
       }
     }
-    if (x < chooseval) {
-      ret = ret | 1 << i;
-      k--;
-    }
     if (k > 0 && k <= precompute_limit) {
       ret |= precompute_strings[k][choose_vals[k]-x-1];
     }
@@ -351,9 +347,24 @@ public:
       _uint chooseval = choose(group_n, k);
       precompute_strings[k].resize(chooseval);
       for (_uint j = 0; j < chooseval; ++j) {
-        precompute_strings[k][j] = get_bit_stream(group_n, k, j);
+        precompute_strings[k][j] = mask & get_bit_stream(group_n, k, j);
       }
     }
+  }
+
+  bool bijectivity_test() {
+    for (_uint num_ones = precompute_k; num_ones < group_n; ++num_ones) {
+      std::cout << "num_ones=" << num_ones << " N choose num_ones=" << choose_vals[num_ones] << std::endl;
+      for (_uint i = 0; i < choose_vals[num_ones]; ++i) {
+	for (_uint j = i+1; j < choose_vals[num_ones]; ++j) {
+	  if ( get_bit_stream(group_n, num_ones, i, precompute_k-1) == get_bit_stream(group_n, num_ones, j, precompute_k-1) ) {
+	    std::cout << "\tfailure i=" << i << " j=" << j << std::endl;
+	    return false;
+	  }
+	}
+      }
+    }
+    return true;
   }
 
   void reset() { bin.reset(); }
@@ -374,16 +385,17 @@ public:
           result |= precompute_strings[num_ones][j] << (i*group_size);
         } else {
           result |= get_bit_stream(group_n, num_ones, j, precompute_k-1) << (i*group_size);
+	  //result |= get_bit_stream(group_n, num_ones, j) << (i*group_size);
         }
       }
     }
-    if ( 1 & (invert ^ result) ) {
+    /*if ( 1 & (invert ^ result) ) {
       prob_1 = (prob_1*(double)n_samples + 1.0)/(n_samples+1);
     } else {
       prob_1 = prob_1*(double)n_samples / (n_samples+1);
     }
     ++n_samples;
-    if ( (1 << (n_-1)) & (invert ^ result) ) {
+    if ( 1 & (invert ^ (result >> (n_/2))) ) {
       prob_1 = (prob_1*(double)n_samples + 1.0)/(n_samples+1);
     } else {
       prob_1 = prob_1*(double)n_samples / (n_samples+1);
@@ -391,7 +403,7 @@ public:
     ++n_samples;
     if (n_samples % 10000 == 0) {
       std::cout << "prob_" << n_samples << ":" << prob_1 << std::endl;
-    }
+    }*/
     return mask & (invert ^ result);
   }
 };
