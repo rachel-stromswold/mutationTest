@@ -1,6 +1,6 @@
 #include "main.h"
 
-namespace plt = matplotlibcpp;
+//namespace plt = matplotlibcpp;
 
 std::vector<unsigned> sample_bernoulli(unsigned n, double p, std::mt19937& generator, unsigned n_trials=1) {
   std::bernoulli_distribution bern(p);
@@ -179,11 +179,21 @@ TimingStats run_percolation(unsigned n_trials, unsigned len, double p, unsigned 
 
   PercolationTracker<BinomialShufflePrecompute> perc_bin(n_trials, p, len, t_max);
 
+  _uint interval = 500;
+  std::cout << "v";
+  for (_uint i = 0; i < t_max/interval; ++i) {
+    std::cout << " ";
+  }
+  std::cout << "v\n ";
   auto begin = std::chrono::high_resolution_clock::now();
   for (_uint i = 0; i < t_max; ++i) {
     perc_bin.update(generator);
+    if (i % interval == 0) {
+      std::cout << "#" << std::flush;
+    }
   }
   auto end = std::chrono::high_resolution_clock::now();
+  std::cout << "\n";
   ret.binomial_new_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
   ret.binomial_new_avg = (double)ret.binomial_new_total / n_trials;
 
@@ -229,7 +239,7 @@ TimingStats run_percolation(unsigned n_trials, unsigned len, double p, unsigned 
 	    << "n(t)\t| " << theta_fit << "\t| " << sqrt(theta_cov) << "\t| " << theta_r2 << "\t| " << (1-(1-theta_r2)*(n-1)/(n-2)) << "\n"
 	    << "rho(t)\t| " << beta_fit << "\t| " << sqrt(beta_cov) << "\t| " << beta_r2 << "\t| " << (1-(1-beta_r2)*(n-1)/(n-2)) << "\n";
 
-  plt::loglog(time, rho);
+  /*plt::loglog(time, rho);
   plt::loglog(time, rho_fitted);
   plt::title("Average occupation density vs time");
   plt::xlabel("time step");
@@ -243,7 +253,7 @@ TimingStats run_percolation(unsigned n_trials, unsigned len, double p, unsigned 
   plt::xlabel("time step");
   plt::ylabel("n(t)");
   plt::save("occ.png");
-  plt::clf();
+  plt::clf();*/
   delete[] ln_time;
   delete[] ln_occ;
   delete[] ln_rho;

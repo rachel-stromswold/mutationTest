@@ -10,7 +10,7 @@ private:
   _uint last_bit;
   _uint t_max;
   _uint t = 0;
-  _uint steady_state_t = t_max - 1;
+  _uint steady_state_t;
   double p;
 //  std::vector<std::vector<_uint>> bitstrings;//bitstrings[time][spatial location]
   std::vector<_uint> bitstring;
@@ -22,7 +22,7 @@ private:
   }
 
 public:
-  DirectedPercolator1(double p_p, _uint pt_max, _uint p_string_size=32) : bitstring(t_max + 1, 0) {
+  DirectedPercolator1(double p_p, _uint pt_max, _uint p_string_size=32) : bitstring(pt_max + 1, 0) {
     t_max = pt_max;
     string_size = p_string_size;
     last_bit = 1 << (string_size - 1);

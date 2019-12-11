@@ -2,7 +2,7 @@
 #define MAIN_H
 
 //#include "include/bitstrings.hpp"
-#include "matplotlib-cpp/matplotlibcpp.h"
+//#include "matplotlib-cpp/matplotlibcpp.h"
 #include "include/percolation.hpp"
 #include <gsl/gsl_fit.h>
 #include <map>
