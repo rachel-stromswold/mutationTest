@@ -138,22 +138,26 @@ public:
       //UniformInt<_uint> unif(0, j+1);
       _uint shift = unif(g);
       //_uint t = 1 << unif(g);
-      _uint t = 1 << shift;
-      std::cout << " " << shift;
+      _uint t = (_uint)1 << shift;
+      /*if (shift >= 10) {
+	std::cout << " " << shift;
+      } else {
+	std::cout << "  " << shift;
+      }*/
       if ((val & t) != 0) {
-        val = val | (1 << j);
+        val = val | ((_uint)1 << j);
       } else {
         val = val | t;
       }
-      if ( (val >> 31) & 1 ) { std::cout << "!" }
+      //if ( (val >> 31) & 1 ) { std::cout << "!"; } else { std::cout << " "; }
     }
-    if ( (val >> 31) & 1 ) {
+    /*if ( (val >> 31) & 1 ) {
       test_p = (test_p*n_samples + 1)/(n_samples + 1);
     } else {
       test_p = test_p*n_samples/(n_samples + 1);
     }
-    ++n_samples;
-    std::cout << " " << test_p << std::endl;
+    ++n_samples;*/
+    //std::cout << " " << test_p << std::endl;
     return invert ^ val;
   }
 };
@@ -177,7 +181,8 @@ public:
     p_ = p;
     if (p > 0.5) {
       p = 1 - p;
-      invert = (1 << (n-1)) | ((1 << (n-1))-1);
+      _uint last_bit = (_uint)1 << (n-1);
+      invert = last_bit | (last_bit - 1);
     }
     lambda = -(double)n*log(1-p);
     poiss = std::poisson_distribution<_uint>(lambda);
@@ -192,7 +197,7 @@ public:
     _uint n_strings = poiss(g);
     _uint val = 0;
     for (_uint j = 0; j < n_strings; ++j) {
-      val = val | (1 << unif(g));
+      val = val | ((_uint)1 << unif(g));
     }
     return invert ^ val;
   }
