@@ -20,6 +20,8 @@ private:
     if (t >= string_size) { return (last_bit-1) | last_bit; }
     return (1 << t) - 1;
   }
+  _uint n_samples = 0;
+  double test_p0, test_pl, test_pm;
 
 public:
   DirectedPercolator1(double p_p, _uint pt_max, bool relax, _uint p_string_size) : bitstring(pt_max + 1, 0) {
@@ -38,12 +40,15 @@ public:
     bitstrings[0][0] = 1;*/
     if (relax) {
       for (_uint i = 0 ; i < bitstring.size(); ++i) {
-	//set everything to be the all ones state
-	bitstring[i] = last_bit | (last_bit-1);
+        //set everything to be the all ones state
+        bitstring[i] = last_bit | (last_bit-1);
       }
     } else {
       bitstring[0] = 1;
     }
+    test_p0 = 0;
+    test_pl = 0;
+    test_pm = 0;
   }
 
   template <typename Generator>
@@ -52,28 +57,30 @@ public:
     ++t;
     std::vector<_uint> old_bitstring = bitstring;
     _uint n_strings = (t + string_size) / string_size;
-    std::vector<_uint> l_bonds(n_strings);
-    std::vector<_uint> r_bonds(n_strings);
+    //std::vector<_uint> l_bonds(n_strings);
+    //std::vector<_uint> r_bonds(n_strings);
+    _uint l_bonds;
+    _uint r_bonds;
     if (t < steady_state_t && t < t_max) {
       bool all_zeros = true;
 
       for (_uint i = 0; i < n_strings; ++i) {
-	//handle carryover
-	if (i > 0 && (old_bitstring[i-1] & last_bit) > 0) {
-	  if ((l_bonds[i-1] & last_bit) > 0) {
-	    bitstring[i] = 1;
-	  } else {
-	    bitstring[i] = 0;
-	  }
-	} else {
-	  bitstring[i] = 0;
-	}
-	//perform updates
-	l_bonds[i] = s(g);
-	r_bonds[i] = s(g);
+        //handle carryover
+        if (i > 0 && (old_bitstring[i-1] & last_bit) > 0) {
+          if ((l_bonds & last_bit) > 0) {
+            bitstring[i] = 1;
+          } else {
+            bitstring[i] = 0;
+          }
+        } else {
+          bitstring[i] = 0;
+        }
+        //perform updates
+        l_bonds = s(g);
+        r_bonds = s(g);
 
-	bitstring[i] |= (old_bitstring[i] & r_bonds[i]);
-	bitstring[i] |= ( (old_bitstring[i] & l_bonds[i]) << 1 ) & mask;
+        bitstring[i] |= (old_bitstring[i] & r_bonds);
+        bitstring[i] |= ( (old_bitstring[i] & l_bonds) << 1 ) & mask;
         if (bitstring[i] != 0) { all_zeros = false; }
       }
       if (all_zeros) {
@@ -87,15 +94,15 @@ public:
     _uint mask = last_bit | (last_bit - 1);
     if (t == 0) {
       if (relax) {
-	for (_uint i = 0; i < t_max; ++i) {
-	  std::cout << "1 ";
-	}
-	std::cout << "1\n";
+        for (_uint i = 0; i < t_max; ++i) {
+          std::cout << "1 ";
+        }
+        std::cout << "1\n";
       } else {
-	for (_uint i = 0; i < t_max - (t+1); ++i) {
-	  std::cout << " ";
-	}
-	std::cout << "1\n";
+        for (_uint i = 0; i < t_max - (t+1); ++i) {
+          std::cout << " ";
+        }
+        std::cout << "1\n";
       }
     }
     ++t;
@@ -107,84 +114,91 @@ public:
       bool all_zeros = true;
 
       for (_uint i = 0; i < n_strings; ++i) {
-	//handle carryover
-	if (i > 0 && (old_bitstring[i-1] & last_bit) > 0) {
-	  if ((l_bonds[i-1] & last_bit) > 0) {
-	    bitstring[i] = 1;
-	  } else {
-	    bitstring[i] = 0;
-	  }
-	} else {
-	  bitstring[i] = 0;
-	}
-	//perform updates
-	//_uint l_bonds = s(g);
-        //_uint r_bonds = s(g);
-	l_bonds[i] = s(g);
-	r_bonds[i] = s(g);
+        //handle carryover
+        if (i > 0 && (old_bitstring[i-1] & last_bit) > 0) {
+          if ((l_bonds[i-1] & last_bit) > 0) {
+            bitstring[i] = 1;
+          } else {
+            bitstring[i] = 0;
+          }
+        } else {
+          bitstring[i] = 0;
+        }
+        //perform updates
+        //_uint l_bonds = s(g);
+              //_uint r_bonds = s(g);
+        l_bonds[i] = s(g);
+        r_bonds[i] = s(g);
+        _uint samples0 = (l_bonds[i] & 1) + (r_bonds[i] & 1);
+        _uint samplesm = ((l_bonds[i] >> (string_size/2)) & 1) + ((r_bonds[i] >> (string_size/2)) & 1);
+        _uint samplesl = ((l_bonds[i] >> (string_size-1)) & 1) + ((r_bonds[i] >> (string_size-1)) & 1);
+        test_p0 = ( test_p0*n_samples + (double)(samples0) )/(n_samples+2);
+        test_pm = ( test_pm*n_samples + (double)(samplesm) )/(n_samples+2);
+        test_pl = ( test_pl*n_samples + (double)(samplesl) )/(n_samples+2);
+        n_samples += 2;
 
-	bitstring[i] |= (old_bitstring[i] & r_bonds[i]);
-	bitstring[i] |= ( (old_bitstring[i] & l_bonds[i]) << 1 ) & mask;
+        bitstring[i] |= (old_bitstring[i] & r_bonds[i]);
+        bitstring[i] |= ( (old_bitstring[i] & l_bonds[i]) << 1 ) & mask;
         if (bitstring[i] != 0) { all_zeros = false; }
-	std::cout << bitstring[i] << " ";
+        std::cout << bitstring[i] << " ";
       }
       std::cout << "\n";
+      std::cout << "p0: " << test_p0 << ", pm" << test_pm << ", pl" << test_pl << std::endl;
       if (all_zeros) {
         steady_state_t = t;
       }
       _uint old_t = t;
       if (relax) {
-	t = t_max;
+        t = t_max;
       } else {
-	for (_uint i = 1; i < t_max - (t+1); ++i) {
-	  std::cout << " ";
-	}
+        for (_uint i = 1; i < t_max - (t+1); ++i) {
+          std::cout << " ";
+        }
       }
 
       _uint status = 0;
       for (_uint i = 0; i <= t; ++i) {
-	_uint ind = (t-i) / string_size;
-	_uint bit = (t-i) % string_size;
-	status = ( 2 & (l_bonds[ind] >> (bit-1)) ) | ( 1 & (r_bonds[ind] >> bit) ) ;
-	if ( ((old_bitstring[ind] >> bit) & 1) != 0 && i < t) {
-	  if (status == 0) {
-	    std::cout << " ";
-	  } else if (status == 1) {
-	    std::cout << "\\";
-	  } else if (status == 2) {
-	    std::cout << "/";
-	  } else {
-	    std::cout << "^";
-	  }
-	} else {
-	  std::cout << " ";
-	}
-	if (i < t) {
-	  std::cout << " ";
-	}
+        _uint ind = (t-i) / string_size;
+        _uint bit = (t-i) % string_size;
+        status = ( 2 & (l_bonds[ind] >> (bit-1)) ) | ( 1 & (r_bonds[ind] >> bit) ) ;
+        if ( ((old_bitstring[ind] >> bit) & 1) != 0 && i < t) {
+          if (status == 0) {
+            std::cout << " ";
+          } else if (status == 1) {
+            std::cout << "\\";
+          } else if (status == 2) {
+            std::cout << "/";
+          } else {
+            std::cout << "^";
+          }
+        } else {
+          std::cout << " ";
+        }
+        if (i < t) {
+          std::cout << " ";
+        }
       }
-      if (old_bitstring[0] & 1 != 0) {
-	status = (r_bonds[0] & 1) | ((l_bonds[0] & 1)<< 1);
-	if (status == 0) {
-	  std::cout << " ";
-	} else if (status == 1) {
-	  std::cout << "\\";
-	} else if (status == 2) {
-	  std::cout << "/";
-	} else {
-	  std::cout << "^";
-	}
+      if ((old_bitstring[0] & 1) != 0) {
+        status = (r_bonds[0] & 1) | ((l_bonds[0] & 1)<< 1);
+        if (status == 0) {
+          std::cout << " ";
+        } else if (status == 1) {
+          std::cout << "\\";
+        } else if (status == 2) {
+          std::cout << "/";
+        } else {
+          std::cout << "^";
+        }
       }
       std::cout << "\n";
       for (_uint i = 1; i < t_max - t; ++i) {
-	std::cout << " ";
+        std::cout << " ";
       }
       for (_uint i = 0; i <= t; ++i) {
-	_uint ind = (t-i) / string_size;
-	_uint bit = (t-i) % string_size;
-	std::cout << ( (bitstring[ind] >> bit) & 1 ) << " ";
-	_uint status = ( 2 & (l_bonds[ind] >> (bit-1)) ) | ( 1 & (r_bonds[ind] >> bit) ) ;
-
+        _uint ind = (t-i) / string_size;
+        _uint bit = (t-i) % string_size;
+        std::cout << ( (bitstring[ind] >> bit) & 1 ) << " ";
+        _uint status = ( 2 & (l_bonds[ind] >> (bit-1)) ) | ( 1 & (r_bonds[ind] >> bit) );
       }
       std::cout << "\n";
       t = old_t;
@@ -279,12 +293,12 @@ public:
       std::cout << std::endl;*/
       avg_occupation_n[t] += (double)(percs[i].get_n_t()) / percs.size();
       if (relax) {
-	avg_rho[t] += (double)(percs[i].get_n_t()) / (percs.size()*t_max);
+        avg_rho[t] += (double)(percs[i].get_n_t()) / (percs.size()*t_max);
       } else {
-	avg_rho[t] += percs[i].get_rho_t() / percs.size();
+        avg_rho[t] += percs[i].get_rho_t() / percs.size();
       }
       if (percs[i].alive()) {
-	++n_survivors[t];
+        ++n_survivors[t];
       }
     }
   }

@@ -239,6 +239,7 @@ TimingStats run_percolation(unsigned n_trials, unsigned len, double p, bool rela
   }
   end = std::chrono::high_resolution_clock::now();
   ret.binomial_old_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
+  std::cout << "\n";
 
   std::cout << "Now running new-binomial test\nv";
   for (_uint i = 0; i < t_max/INTERVAL; ++i) {
@@ -254,6 +255,7 @@ TimingStats run_percolation(unsigned n_trials, unsigned len, double p, bool rela
   }
   end = std::chrono::high_resolution_clock::now();
   ret.binomial_new_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
+  std::cout << "\n";
 
   std::cout << "Now running poisson finite digit test\nv";
   for (_uint i = 0; i < t_max/INTERVAL; ++i) {
@@ -286,7 +288,6 @@ TimingStats run_percolation(unsigned n_trials, unsigned len, double p, bool rela
   end = std::chrono::high_resolution_clock::now();
   ret.hybrid_binomial_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
   std::cout << "\n";
-
 
   ret.bernoulli_avg = (double)ret.bernoulli_total / n_trials;
   ret.poisson_avg = (double)ret.poisson_total / n_trials;
@@ -345,12 +346,14 @@ TimingStats run_percolation(unsigned n_trials, unsigned len, double p, bool rela
     occ_fitted[i] = pow(time[i], theta_fit);
     rho_fitted[i] = pow(time[i], beta_fit);
   }
-  theta_r2 = 1 - theta_sumsq_res/occ_ss;
-  beta_r2 = 1 - beta_sumsq_res/rho_ss;
+  theta_r2 = 1.0 - theta_sumsq_res/occ_ss;
+  beta_r2 = 1.0 - beta_sumsq_res/rho_ss;
+  double theta_r2_adj = (1.0-(1.0-theta_r2)*(n-1)/(n-2));
+  double beta_r2_adj = (1.0-(1.0-beta_r2)*(n-1)/(n-2));
 
   std::cout << "data\t| power law\t| std_dev\t| R^2\t|R^2 (adjusted)\n"
-	    << "n(t)\t| " << theta_fit << "\t| " << sqrt(theta_cov) << "\t| " << theta_r2 << "\t| " << (1-(1-theta_r2)*(n-1)/(n-2)) << "\n"
-	    << "rho(t)\t| " << beta_fit << "\t| " << sqrt(beta_cov) << "\t| " << beta_r2 << "\t| " << (1-(1-beta_r2)*(n-1)/(n-2)) << "\n";
+	    << "n(t)\t| " << theta_fit << "\t| " << sqrt(theta_cov) << "\t| " << theta_r2 << "\t| " << theta_r2_adj << "\n"
+	    << "rho(t)\t| " << beta_fit << "\t| " << sqrt(beta_cov) << "\t| " << beta_r2 << "\t| " << beta_r2_adj << "\n";
 
   delete[] ln_time;
   delete[] ln_occ;

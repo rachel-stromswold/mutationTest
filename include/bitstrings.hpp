@@ -1,7 +1,7 @@
 #ifndef BITSTRINGS_H
 #define BITSTRINGS_H
 
-#include "../uint128_t/uint128_t.h"
+//#include "../uint128_t/uint128_t.h"
 #include <random>
 #include <iostream>
 #include <math.h>
@@ -36,7 +36,7 @@ _uint get_bit_stream_slow(_uint n, _uint k, _uint x) {
 }
 
 //generates uniformly distributed random inegers in the range [a, b)
-template <typename _int=_uint>
+/*template <typename _int=_uint>
 class UniformInt {
 private:
   _int a, b;//s = a-b
@@ -71,7 +71,7 @@ public:
     }
     return m >> n_bits;
   }
-};
+};*/
 
 class RepeatBernoulli {
 private:
@@ -109,6 +109,8 @@ private:
   double p_;
   std::binomial_distribution<_uint> bin;
   _uint invert = 0;
+  double test_p = 0;
+  _uint n_samples = 0;
 
 public:
   BinomialShuffleOld(_uint n, double p) : bin(n, p) {
@@ -134,13 +136,24 @@ public:
     for (_uint j = n_ - num_ones; j < n_; ++j) {
       std::uniform_int_distribution<_uint> unif(0, j);
       //UniformInt<_uint> unif(0, j+1);
-      _uint t = 1 << unif(g);
+      _uint shift = unif(g);
+      //_uint t = 1 << unif(g);
+      _uint t = 1 << shift;
+      std::cout << " " << shift;
       if ((val & t) != 0) {
         val = val | (1 << j);
       } else {
         val = val | t;
       }
+      if ( (val >> 31) & 1 ) { std::cout << "!" }
     }
+    if ( (val >> 31) & 1 ) {
+      test_p = (test_p*n_samples + 1)/(n_samples + 1);
+    } else {
+      test_p = test_p*n_samples/(n_samples + 1);
+    }
+    ++n_samples;
+    std::cout << " " << test_p << std::endl;
     return invert ^ val;
   }
 };
@@ -287,7 +300,7 @@ private:
       //std::cout << "choose: " << choose((n-i)-1, k-1) << ", nval: " << chooseval << std::endl;
       if (x < chooseval ) {
         ret = ret | (0x01 << i);
-        k--;
+        --k;
         //special transformation to map chooseval to choose(n-(i+1)-1, (k-1)-1)
         chooseval *= k;
         chooseval /= n-i-1;
@@ -297,6 +310,10 @@ private:
         chooseval *= n-i-k;
         chooseval /= n-i-1;
       }
+    }
+    if ( precompute_limit == 0 && x < chooseval ) {
+      ret = ret | (1 << i);
+      --k;
     }
     if (k > 0 && k <= precompute_limit) {
       ret |= precompute_strings[k][choose_vals[k]-x-1];
@@ -369,13 +386,13 @@ public:
       if (num_ones != 0) {
         //minus 1 because we start indexing from 0
         std::uniform_int_distribution<_uint> unif(0, choose_vals[num_ones] - 1);
-	//UniformInt<_uint> unif(0, choose_vals[num_ones]);
+        //UniformInt<_uint> unif(0, choose_vals[num_ones]);
         _uint j = unif(g);
         if (num_ones < precompute_k) {
           result |= precompute_strings[num_ones][j] << (i*group_size);
         } else {
           result |= get_bit_stream(group_n, num_ones, j, precompute_k-1) << (i*group_size);
-	  //result |= get_bit_stream(group_n, num_ones, j) << (i*group_size);
+          //result |= get_bit_stream(group_n, num_ones, j) << (i*group_size);
         }
       }
     }
