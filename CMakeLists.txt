@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.11)
 project(QA_opt)
 include(FetchContent)
 set (CMAKE_CXX_STANDARD 11)
-set(CMAKE_BUILD_TYPE Debug)
+set(CMAKE_BUILD_TYPE Release)
 
 message("CMake install dir ${CMAKE_MODULE_PATH}")
 message("CMake build dir ${CMAKE_CURRENT_BINARY_DIR}")

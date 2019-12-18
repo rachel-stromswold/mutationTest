@@ -1,0 +1,6 @@
+bin/CMake*
+bin/*.csv
+bin/*.png
+bin/Makefile
+bin/cmake_install.cmake
+bin/main

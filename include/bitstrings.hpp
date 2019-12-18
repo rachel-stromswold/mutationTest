@@ -7,6 +7,8 @@
 #include <math.h>
 #include <limits.h>
 
+#define JUMP_THRESH	3
+
 typedef size_t _uint;
 
 //combinatorics
@@ -135,29 +137,14 @@ public:
 
     for (_uint j = n_ - num_ones; j < n_; ++j) {
       std::uniform_int_distribution<_uint> unif(0, j);
-      //UniformInt<_uint> unif(0, j+1);
       _uint shift = unif(g);
-      //_uint t = 1 << unif(g);
       _uint t = (_uint)1 << shift;
-      /*if (shift >= 10) {
-	std::cout << " " << shift;
-      } else {
-	std::cout << "  " << shift;
-      }*/
       if ((val & t) != 0) {
         val = val | ((_uint)1 << j);
       } else {
         val = val | t;
       }
-      //if ( (val >> 31) & 1 ) { std::cout << "!"; } else { std::cout << " "; }
     }
-    /*if ( (val >> 31) & 1 ) {
-      test_p = (test_p*n_samples + 1)/(n_samples + 1);
-    } else {
-      test_p = test_p*n_samples/(n_samples + 1);
-    }
-    ++n_samples;*/
-    //std::cout << " " << test_p << std::endl;
     return invert ^ val;
   }
 };
@@ -301,28 +288,40 @@ private:
     _uint chooseval = choose_vals[k]*k/n;
     //note that we only go to i=n-2 to avoid a divide by zero, the i=n-1 case is handled after the loop
     _uint i = 0;
+
     for (; k > precompute_limit && i < n-1; ++i) {
       //std::cout << "choose: " << choose((n-i)-1, k-1) << ", nval: " << chooseval << std::endl;
-      if (x < chooseval ) {
-        ret = ret | (0x01 << i);
+      if (x < chooseval) {
+        ret = ret | ((_uint)1 << i);
         --k;
         //special transformation to map chooseval to choose(n-(i+1)-1, (k-1)-1)
         chooseval *= k;
         chooseval /= n-i-1;
-      } else {
+      } else if (x < JUMP_THRESH*chooseval || i + JUMP_THRESH + 1 > n) {
+	//std::cout << p_ << " " << (x/chooseval) << std::endl;
         x -= chooseval;
         //special transformation to map chooseval to choose(n-(i+1)-1, k-1)
         chooseval *= n-i-k;
         chooseval /= n-i-1;
+      } else {
+	_uint jj = x / chooseval;
+	//sum_{j=0}^{jj} choose(n-1-jj+k, k) = choose(n-k+jj, k) - choose(n+k-jj-1, k)
+	_uint ni_choose_k = chooseval*(n-i)/k;
+	chooseval = choose(n-i-jj-1, k-1);
+	x -= ni_choose_k - chooseval*(n-i-jj)/k;
+	i += jj-1;
       }
     }
+
     if ( precompute_limit == 0 && x < chooseval ) {
       ret = ret | (1 << i);
       --k;
     }
+
     if (k > 0 && k <= precompute_limit) {
       ret |= precompute_strings[k][choose_vals[k]-x-1];
     }
+
     return ret;
   }
 

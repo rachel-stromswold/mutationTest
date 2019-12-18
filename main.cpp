@@ -96,33 +96,24 @@ TimingStats test_non_hybrid(unsigned n_trials, unsigned len, double p, unsigned 
   end = std::chrono::high_resolution_clock::now();
   ret.binomial_new_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
 
-  /*if (digit.get_correction() == 0) {
-    begin = std::chrono::high_resolution_clock::now();
-    for (unsigned i = 0; i < n_trials; ++i) {
-      digit_test[i] = digit(generator);
-    }
-    end = std::chrono::high_resolution_clock::now();
-    ret.hybrid_poisson_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
-    ret.hybrid_binomial_total = ret.hybrid_poisson_total;
-  } else {*/
-    //initialize the clock for the finite digit method (poisson correction)
-    begin = std::chrono::high_resolution_clock::now();
-    for (unsigned i = 0; i < n_trials; ++i) {
-      digit_test[i] = digit_poi(generator);
-      //digit_test[i] |= poi_correction(generator);
-    }
-    end = std::chrono::high_resolution_clock::now();
-    ret.hybrid_poisson_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
+  //initialize the clock for the finite digit method (poisson correction)
+  begin = std::chrono::high_resolution_clock::now();
+  for (unsigned i = 0; i < n_trials; ++i) {
+    digit_test[i] = digit_poi(generator);
+    //digit_test[i] |= poi_correction(generator);
+  }
+  end = std::chrono::high_resolution_clock::now();
+  ret.hybrid_poisson_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
 
-    //initialize the clock for the finite digit method (new binomial correction)
-    begin = std::chrono::high_resolution_clock::now();
-    for (unsigned i = 0; i < n_trials; ++i) {
-      digit_test[i] = digit_bin(generator);
-      //digit_test[i] |= bin_correction(generator);
-    }
-    end = std::chrono::high_resolution_clock::now();
-    ret.hybrid_binomial_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
-  //}
+  //initialize the clock for the finite digit method (new binomial correction)
+  begin = std::chrono::high_resolution_clock::now();
+  for (unsigned i = 0; i < n_trials; ++i) {
+    digit_test[i] = digit_bin(generator);
+    //digit_test[i] |= bin_correction(generator);
+  }
+  end = std::chrono::high_resolution_clock::now();
+  ret.hybrid_binomial_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
+ 
 
   std::ofstream dout;
   dout.open("dat.csv");
@@ -297,12 +288,6 @@ TimingStats run_percolation(unsigned n_trials, unsigned len, double p, bool rela
   ret.hybrid_binomial_avg = (double)ret.hybrid_binomial_total / n_trials;
 
   std::vector<double> time = perc_bern.get_time_arr();
-  /*std::vector<double> bern_occupation = perc_bern.get_occupation_n_arr();
-  std::vector<double> bern_rho = perc_bern.get_rho_arr();
-  std::vector<_uint> bern_survivors = perc_bern.get_n_survivors();
-  std::vector<double> bin_occupation = perc_bern.get_occupation_n_arr();
-  std::vector<double> bin_rho = perc_bern.get_rho_arr();
-  std::vector<_uint> bern_survivors = perc_bern.get_n_survivors();*/
   _uint n = time.size();
 
   double* ln_time = new double[n];
