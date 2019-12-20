@@ -7,7 +7,7 @@
 #include <math.h>
 #include <limits.h>
 
-#define JUMP_THRESH	3
+#define JUMP_THRESH	5
 
 typedef size_t _uint;
 
@@ -208,7 +208,7 @@ private:
     for (; k > 0 && i < n-1; ++i) {
       //std::cout << "choose: " << choose((n-i)-1, k-1) << ", nval: " << chooseval << std::endl;
       if (x < chooseval ) {
-        ret = ret | (0x01 << i);
+        ret = ret | ((_uint)1 << i);
         k--;
         //special transformation to map chooseval to choose(n-(i+1)-1, (k-1)-1)
         chooseval *= k;
@@ -272,7 +272,8 @@ private:
   _uint n_;
   double p_;
   std::binomial_distribution<_uint> bin;
-  std::vector<_uint> choose_vals;
+  //std::vector<_uint> choose_vals;
+  std::vector<std::vector<_uint>> choose_vals;
   _uint group_size = 32;
   _uint group_n = group_size;
   _uint n_groups = 1;
@@ -285,7 +286,8 @@ private:
   _uint get_bit_stream(_uint n, _uint k, _uint x, _uint precompute_limit=0) {
     _uint ret = 0;
     //correction factor to get in terms of n-1 choose k-1
-    _uint chooseval = choose_vals[k]*k/n;
+    //_uint chooseval = choose_vals[n][k]*k/n;
+    _uint chooseval = choose_vals[n-1][k-1];
     //note that we only go to i=n-2 to avoid a divide by zero, the i=n-1 case is handled after the loop
     _uint i = 0;
 
@@ -304,12 +306,13 @@ private:
         chooseval *= n-i-k;
         chooseval /= n-i-1;
       } else {
-	_uint jj = x / chooseval;
-	//sum_{j=0}^{jj} choose(n-1-jj+k, k) = choose(n-k+jj, k) - choose(n+k-jj-1, k)
-	_uint ni_choose_k = chooseval*(n-i)/k;
-	chooseval = choose(n-i-jj-1, k-1);
-	x -= ni_choose_k - chooseval*(n-i-jj)/k;
-	i += jj-1;
+        _uint jj = x / chooseval;
+        //sum_{j=0}^{jj} choose(n-1-jj+k, k) = choose(n-k+jj, k) - choose(n+k-jj-1, k)
+        //_uint ni_choose_k = chooseval*(n-i)/k;
+        //chooseval = choose(n-i-jj-1, k-1);
+        chooseval = choose_vals[n-i-jj-1][k-1];
+        x -= choose_vals[n-i][k] - chooseval*(n-i-jj)/k;
+        i += jj-1;
       }
     }
 
@@ -319,7 +322,7 @@ private:
     }
 
     if (k > 0 && k <= precompute_limit) {
-      ret |= precompute_strings[k][choose_vals[k]-x-1];
+      ret |= precompute_strings[k][choose_vals[n][k]-x-1];
     }
 
     return ret;
@@ -348,9 +351,16 @@ public:
       p_ = p;
     }
     
-    for (_uint i = 0; 2*i <= group_n; ++i) {
-      choose_vals[i] = choose(group_n, i);
+    /*for (_uint i = 0; 2*i <= group_n; ++i) {
+      choose_vals[i] = choose(m, i);
       choose_vals[n-i] = choose_vals[i];
+    }*/
+    for (_uint m = 0; m <= n; ++m) {
+      choose_vals[m].resize(m+1);
+      for (_uint i = 0; 2*i <= group_n; ++i) {
+        choose_vals[m][i] = choose(m, i);
+        choose_vals[m][n-i] = choose_vals[m][i];
+      }
     }
 
     for (_uint k = 0; k < precompute_k; ++k) {
@@ -364,9 +374,9 @@ public:
 
   bool bijectivity_test() {
     for (_uint num_ones = precompute_k; num_ones < group_n; ++num_ones) {
-      std::cout << "num_ones=" << num_ones << " N choose num_ones=" << choose_vals[num_ones] << std::endl;
-      for (_uint i = 0; i < choose_vals[num_ones]; ++i) {
-        for (_uint j = i+1; j < choose_vals[num_ones]; ++j) {
+      std::cout << "num_ones=" << num_ones << " N choose num_ones=" << choose_vals[group_n][num_ones] << std::endl;
+      for (_uint i = 0; i < choose_vals[group_n][num_ones]; ++i) {
+        for (_uint j = i+1; j < choose_vals[group_n][num_ones]; ++j) {
           if ( get_bit_stream(group_n, num_ones, i, precompute_k-1) == get_bit_stream(group_n, num_ones, j, precompute_k-1) ) {
             std::cout << "\tfailure i=" << i << " j=" << j << std::endl;
             return false;
@@ -389,7 +399,7 @@ public:
 
       if (num_ones != 0) {
         //minus 1 because we start indexing from 0
-        std::uniform_int_distribution<_uint> unif(0, choose_vals[num_ones] - 1);
+        std::uniform_int_distribution<_uint> unif(0, choose_vals[group_n][num_ones] - 1);
         //UniformInt<_uint> unif(0, choose_vals[num_ones]);
         _uint j = unif(g);
         if (num_ones < precompute_k) {

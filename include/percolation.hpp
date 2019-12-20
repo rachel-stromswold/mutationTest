@@ -288,7 +288,7 @@ public:
       //information for debugging
       /*std::vector<bool> status = percs[i].get_state();
       for(_uint j = 0; j < status.size(); ++j) {
-	std::cout << status[j];
+        std::cout << status[j];
       }
       std::cout << std::endl;*/
       avg_occupation_n[t] += (double)(percs[i].get_n_t()) / percs.size();
