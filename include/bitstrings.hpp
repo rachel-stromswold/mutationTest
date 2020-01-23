@@ -357,9 +357,9 @@ public:
     }*/
     for (_uint m = 0; m <= n; ++m) {
       choose_vals[m].resize(m+1);
-      for (_uint i = 0; 2*i <= group_n; ++i) {
+      for (_uint i = 0; 2*i <= m; ++i) {
         choose_vals[m][i] = choose(m, i);
-        choose_vals[m][n-i] = choose_vals[m][i];
+        choose_vals[m][m-i] = choose_vals[m][i];
       }
     }
 
