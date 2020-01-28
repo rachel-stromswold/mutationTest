@@ -105,6 +105,7 @@ public:
         std::cout << "1\n";
       }
     }
+    
     ++t;
     std::vector<_uint> old_bitstring = bitstring;
     _uint n_strings = (t + string_size) / string_size;
@@ -140,10 +141,9 @@ public:
         bitstring[i] |= (old_bitstring[i] & r_bonds[i]);
         bitstring[i] |= ( (old_bitstring[i] & l_bonds[i]) << 1 ) & mask;
         if (bitstring[i] != 0) { all_zeros = false; }
-        std::cout << bitstring[i] << " ";
+        //std::cout << bitstring[i] << " ";
       }
       std::cout << "\n";
-      std::cout << "p0: " << test_p0 << ", pm" << test_pm << ", pl" << test_pl << std::endl;
       if (all_zeros) {
         steady_state_t = t;
       }
@@ -241,6 +241,14 @@ public:
     }
     return true;
   }
+
+  void print_probabilities() {
+    std::cout << "p0: " << test_p0 << ", pm" << test_pm << ", pl" << test_pl << std::endl;
+  }
+  double get_p0() { return test_p0; }
+  double get_pm() { return test_pm; }
+  double get_pl() { return test_pl; }
+  double get_n() { return n_samples; }
 };
 
 template <typename Sampler>
@@ -284,7 +292,7 @@ public:
     avg_rho.push_back(0);
     n_survivors.push_back(0);
     for (_uint i = 0; i < percs.size(); ++i) {
-      percs[i].update(s, g, relax);
+      percs[i].update_debug(s, g, relax);
       //information for debugging
       /*std::vector<bool> status = percs[i].get_state();
       for(_uint j = 0; j < status.size(); ++j) {
@@ -301,6 +309,18 @@ public:
         ++n_survivors[t];
       }
     }
+  }
+
+  void print_probabilities() {
+    double test_p0 = 0, test_pm = 0, test_pl = 0, total_n = 0;
+    for (_uint i = 0; i < percs.size(); ++i) {
+      percs[i].print_probabilities();
+      test_p0 += percs[i].get_p0()*percs[i].get_n();
+      test_pm += percs[i].get_pm()*percs[i].get_n();
+      test_pl += percs[i].get_pl()*percs[i].get_n();
+      total_n += percs[i].get_n();
+    }
+    std::cout << "AVG: p0: " << test_p0/total_n << ", pm" << test_pm/total_n << ", pl" << test_pl/total_n << std::endl;
   }
 
   std::vector<double> get_time_arr() {

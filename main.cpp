@@ -197,6 +197,7 @@ TimingStats run_percolation(unsigned n_trials, unsigned len, double p, bool rela
     }
   }
   auto end = std::chrono::high_resolution_clock::now();
+  std::cout << "perc bern\n\t";perc_bern.print_probabilities();
   ret.bernoulli_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
   std::cout << "\n";
 
@@ -213,6 +214,7 @@ TimingStats run_percolation(unsigned n_trials, unsigned len, double p, bool rela
     }
   }
   end = std::chrono::high_resolution_clock::now();
+  std::cout << "perc pois\n\t";perc_pois.print_probabilities();
   ret.poisson_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
   std::cout << "\n";
 
@@ -229,6 +231,7 @@ TimingStats run_percolation(unsigned n_trials, unsigned len, double p, bool rela
     }
   }
   end = std::chrono::high_resolution_clock::now();
+  std::cout << "perc bino\n\t";perc_bin_old.print_probabilities();
   ret.binomial_old_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
   std::cout << "\n";
 
@@ -245,6 +248,7 @@ TimingStats run_percolation(unsigned n_trials, unsigned len, double p, bool rela
     }
   }
   end = std::chrono::high_resolution_clock::now();
+  std::cout << "perc binn\n\t";perc_bin_new.print_probabilities();
   ret.binomial_new_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
   std::cout << "\n";
 
@@ -261,6 +265,7 @@ TimingStats run_percolation(unsigned n_trials, unsigned len, double p, bool rela
     }
   }
   end = std::chrono::high_resolution_clock::now();
+  std::cout << "perc hyp\n\t";perc_hyp.print_probabilities();
   ret.hybrid_poisson_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
   std::cout << "\n";
 
@@ -277,6 +282,7 @@ TimingStats run_percolation(unsigned n_trials, unsigned len, double p, bool rela
     }
   }
   end = std::chrono::high_resolution_clock::now();
+  std::cout << "perc hyb\n\t";perc_hyb.print_probabilities();
   ret.hybrid_binomial_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
   std::cout << "\n";
 
