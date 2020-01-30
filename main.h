@@ -3,6 +3,7 @@
 
 //#include "include/bitstrings.hpp"
 #include "include/percolation.hpp"
+#include "include/probability.hpp"
 #include <gsl/gsl_fit.h>
 #include <map>
 #include <iostream>

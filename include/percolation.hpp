@@ -18,7 +18,7 @@ private:
   _uint one_state(_uint t = 0) {
     if (t == 0) { t = string_size; }
     if (t >= string_size) { return (last_bit-1) | last_bit; }
-    return (1 << t) - 1;
+    return ((_uint)1 << t) - 1;
   }
   _uint n_samples = 0;
   double test_p0, test_pl, test_pm;
@@ -28,7 +28,7 @@ public:
     t_max = pt_max;
     steady_state_t = t_max;
     string_size = p_string_size;
-    last_bit = 1 << (string_size - 1);
+    last_bit = (_uint)1 << (string_size - 1);
     /*bitstrings.resize(t_max);
     _uint n_strings = 0;
     for (_uint i = 0; i < t_max; ++i) {
@@ -292,7 +292,7 @@ public:
     avg_rho.push_back(0);
     n_survivors.push_back(0);
     for (_uint i = 0; i < percs.size(); ++i) {
-      percs[i].update_debug(s, g, relax);
+      percs[i].update(s, g, relax);
       //information for debugging
       /*std::vector<bool> status = percs[i].get_state();
       for(_uint j = 0; j < status.size(); ++j) {

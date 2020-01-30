@@ -96,7 +96,7 @@ public:
     _uint berVal = 0;
     for (_uint j = 0; j < n_; ++j) {
       if ( bern(g) ) {
-        berVal = berVal | (0x01 << j);
+        berVal = berVal | ((_uint)1 << j);
       }
     }
     
@@ -163,7 +163,7 @@ private:
 
 public:
   //PoissonOr(_uint n, double p) : unif(0, n-1) {
-  PoissonOr(_uint n, double p) : unif(0, n) {
+  PoissonOr(_uint n, double p) : unif(0, n-1) {
     n_ = n;
     p_ = p;
     if (p > 0.5) {
@@ -317,7 +317,7 @@ private:
     }
 
     if ( precompute_limit == 0 && x < chooseval ) {
-      ret = ret | (1 << i);
+      ret = ret | ((_uint)1 << i);
       --k;
     }
 
@@ -329,12 +329,19 @@ private:
   }
 
 public:
-  BinomialShufflePrecompute(_uint n, double p, double p_precompute_k=4) : choose_vals(n+1), bin(n, p), precompute_strings(p_precompute_k) {
+  BinomialShufflePrecompute(_uint n, double p, double p_precompute_k=4, _uint p_group_size=32) : choose_vals(n+1), bin(n, p), precompute_strings(p_precompute_k), group_size(p_group_size) {
     n_ = n;
     p_ = p;
     //for large bitstrings, it is helpful to chunk results, this mask contains n_ one bits and is safe for n_=<word size>
     mask = ( ((_uint)1 << (n_-1)) - 1 ) | ( (_uint)1 << (n_-1) );
     n_groups = (n + (group_size-1))/group_size;
+
+    if (p > 0.5) {
+      p_ = 1 - p;
+      invert = mask;
+    } else {
+      invert = 0;
+    }
     
     if (n > group_size) {
       n = group_size;
@@ -343,13 +350,13 @@ public:
     group_n = n;
     precompute_k = p_precompute_k;
     
-    if (p > 0.5) {
+    /*if (p > 0.5) {
       p_ = 1 - p;
       invert = mask;
       bin = std::binomial_distribution<_uint>(n, p_);
     } else {
       p_ = p;
-    }
+    }*/
     
     /*for (_uint i = 0; 2*i <= group_n; ++i) {
       choose_vals[i] = choose(m, i);
@@ -402,12 +409,23 @@ public:
         std::uniform_int_distribution<_uint> unif(0, choose_vals[group_n][num_ones] - 1);
         //UniformInt<_uint> unif(0, choose_vals[num_ones]);
         _uint j = unif(g);
+        _uint tmp = 0;
         if (num_ones < precompute_k) {
-          result |= precompute_strings[num_ones][j] << (i*group_size);
+          tmp = precompute_strings[num_ones][j] << (i*group_size);
+          //result |= precompute_strings[num_ones][j] << (i*group_size);
         } else {
-          result |= get_bit_stream(group_n, num_ones, j, precompute_k-1) << (i*group_size);
+          tmp = get_bit_stream(group_n, num_ones, j, precompute_k-1) << (i*group_size);
+          //result |= get_bit_stream(group_n, num_ones, j, precompute_k-1) << (i*group_size);
           //result |= get_bit_stream(group_n, num_ones, j) << (i*group_size);
         }
+        result |= tmp;
+
+        /*_uint garbage = (result >> (i*group_size)) & (((_uint)1 << (i*group_size)) - 1);
+        tmp = (tmp >> (i*group_size)) & (((_uint)1 << (i*group_size)) - 1);
+        if (garbage != tmp) {
+          std::cout << "yikes! " << garbage << " " << tmp << std::endl
+                    << "       " << num_ones << " " << pre_result << std::endl;
+        }*/
       }
     }
     /*if ( 1 & (invert ^ result) ) {

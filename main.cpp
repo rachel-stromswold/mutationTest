@@ -1,5 +1,9 @@
 #include "main.h"
 
+#define TEST_DIST 0
+#define TEST_PERC 1
+#define TEST_PROB 2
+
 //namespace plt = matplotlibcpp;
 
 std::vector<unsigned> sample_bernoulli(unsigned n, double p, std::mt19937& generator, unsigned n_trials=1) {
@@ -353,6 +357,99 @@ TimingStats run_percolation(unsigned n_trials, unsigned len, double p, bool rela
   return ret;
 }
 
+TimingStats test_probabilities(unsigned n_trials, unsigned len, double p, unsigned seed=DEF_SEED) {
+  std::mt19937 generator;
+  generator.seed(seed);
+  TimingStats ret;
+
+  RepeatBernoulli bern(len, p);
+  PoissonOr pois(len, p);
+  BinomialShuffleOld bin_old(len, p);
+  BinomialShufflePrecompute bin_new(len, p, 4, 32);
+  FiniteDigit<PoissonOr> hyp(len, p);
+  FiniteDigit<BinomialShufflePrecompute> hyb(len, p);
+
+  std::vector<unsigned> bern_arr(len, 0);
+  std::vector<unsigned> pois_arr(len, 0);
+  std::vector<unsigned> bin_old_arr(len, 0);
+  std::vector<unsigned> bin_new_arr(len, 0);
+  std::vector<unsigned> hyp_arr(len, 0);
+  std::vector<unsigned> hyb_arr(len, 0);
+
+  _uint sample = 0;
+  for (_uint i = 0; i < n_trials; ++i) {
+    sample = bern(generator);
+    update_counts_array(bern_arr, sample, n_trials, len);
+    sample = pois(generator);
+    update_counts_array(pois_arr, sample, n_trials, len);
+    sample = bin_old(generator);
+    update_counts_array(bin_old_arr, sample, n_trials, len);
+    sample = bin_new(generator);
+    update_counts_array(bin_new_arr, sample, n_trials, len);
+    sample = hyp(generator);
+    update_counts_array(hyp_arr, sample, n_trials, len);
+    sample = hyb(generator);
+    update_counts_array(hyb_arr, sample, n_trials, len);
+  }
+
+  double upper, lower;
+  std::cout << "bernoulli:\n";
+  for (_uint j = 0; j < len; ++j) {
+    Range r = find_uncertainty(bern_arr[j], n_trials);
+    std::cout << "\tp_" << j << "=" << r.avg() << "\u00B1" << r.gap()/2;
+    if (r.max < p || r.min > p) {
+      std::cout << "!";
+    }
+    std::cout << "\n";
+  }
+  std::cout << "poisson:\n";
+  for (_uint j = 0; j < len; ++j) {
+    Range r = find_uncertainty(pois_arr[j], n_trials);
+    std::cout << "\tp_" << j << "=" << r.avg() << "\u00B1" << r.gap()/2;
+    if (r.max < p || r.min > p) {
+      std::cout << "!";
+    }
+    std::cout << "\n";
+  }
+  std::cout << "binomial old:\n";
+  for (_uint j = 0; j < len; ++j) {
+    Range r = find_uncertainty(bin_old_arr[j], n_trials);
+    std::cout << "\tp_" << j << "=" << r.avg() << "\u00B1" << r.gap()/2;
+    if (r.max < p || r.min > p) {
+      std::cout << "!";
+    }
+    std::cout << "\n";
+  }
+  std::cout << "binomial new:\n";
+  for (_uint j = 0; j < len; ++j) {
+    Range r = find_uncertainty(bin_new_arr[j], n_trials);
+    std::cout << "\tp_" << j << "=" << r.avg() << "\u00B1" << r.gap()/2;
+    if (r.max < p || r.min > p) {
+      std::cout << "!";
+    }
+    std::cout << "\n";
+  }
+  std::cout << "finite digit (new binomial):\n";
+  for (_uint j = 0; j < len; ++j) {
+    Range r = find_uncertainty(hyb_arr[j], n_trials);
+    std::cout << "\tp_" << j << "=" << r.avg() << "\u00B1" << r.gap()/2;
+    if (r.max < p || r.min > p) {
+      std::cout << "!";
+    }
+    std::cout << "\n";
+  }
+  std::cout << "finite digit (poisson):\n";
+  for (_uint j = 0; j < len; ++j) {
+    Range r = find_uncertainty(hyp_arr[j], n_trials);
+    std::cout << "\tp_" << j << "=" << r.avg() << "\u00B1" << r.gap()/2;
+    if (r.max < p || r.min > p) {
+      std::cout << "!";
+    }
+    std::cout << "\n";
+  }
+  return ret;
+}
+
 int main(int argc, char** argv) {
   unsigned n_trials = NUM_TRIALS;
   unsigned n_steps = NUM_STEPS;
@@ -360,7 +457,7 @@ int main(int argc, char** argv) {
   unsigned seed = DEF_SEED;
   double p = PROBABILITY;
   bool silent = false;
-  bool dist_test = false;
+  _uint test_type = TEST_PERC;
   bool relax = false;
 
   //parse input arguments
@@ -392,8 +489,11 @@ int main(int argc, char** argv) {
     if (strcmp(argv[i], "-q") == 0) {
       silent = true;
     }
-    if (strcmp(argv[i], "-d") == 0) {
-      dist_test = true;
+    if (strcmp(argv[i], "--distribution") == 0) {
+      test_type = TEST_DIST;
+    }
+    if (strcmp(argv[i], "--probabilities") == 0) {
+      test_type = TEST_PROB;
     }
     if (strcmp(argv[i], "-r") == 0 && i != argc - 1) {
       relax = true;
@@ -406,10 +506,12 @@ int main(int argc, char** argv) {
               << "\tseed:              " << seed << std::endl
               << "\tlength:            " << len << std::endl
               << "\tprob:              " << p << std::endl;
-    if (dist_test) {
-      std::cout << "\ttest distribution? yes\n";
+    if (test_type == TEST_DIST) {
+      std::cout << "\ttest type:         distribution\n";
+    } else if (test_type == TEST_PROB) {
+      std::cout << "\ttest type:         probability\n";
     } else {
-      std::cout << "\ttest distribution? no\n";   
+      std::cout << "\ttest type:         percolation\n";
     }
   }
 
@@ -418,10 +520,12 @@ int main(int argc, char** argv) {
   unsigned int binTest2[UCHAR_MAX] = {};*/
 
   TimingStats timings;
-  if (dist_test) {
+  if (test_type == TEST_DIST) {
     timings = test_non_hybrid(n_trials, len, p);
-  } else {
+  } else if (test_type == TEST_PERC) {
     timings = run_percolation(n_trials, len, p, relax, n_steps, seed);
+  } else if (test_type == TEST_PROB) {
+    timings = test_probabilities(n_trials, len, p, seed);
   }
   if (silent) {
     std::cout << timings.bernoulli_total  << " " << timings.bernoulli_avg
