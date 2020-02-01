@@ -187,106 +187,100 @@ TimingStats run_percolation(unsigned n_trials, unsigned len, double p, bool rela
   PercolationTracker<FiniteDigit<PoissonOr>> perc_hyp(n_trials, p, relax, len, t_max);
   PercolationTracker<FiniteDigit<BinomialShufflePrecompute>> perc_hyb(n_trials, p, relax, len, t_max);
 
-  _uint interval = 500;
+  _uint interval = (t_max + STATUS_BAR_LEN-1) / STATUS_BAR_LEN;
   std::cout << "Now running bernoulli test\nv";
-  for (_uint i = 0; i < t_max/INTERVAL; ++i) {
+  for (_uint i = 0; i < t_max / interval + 1; ++i) {
     std::cout << " ";
   }
   std::cout << "v\n ";
   auto begin = std::chrono::high_resolution_clock::now();
   for (_uint i = 0; i < t_max; ++i) {
     perc_bern.update(generator);
-    if (i % INTERVAL == 0) {
+    if (i % interval == 0) {
       std::cout << "#" << std::flush;
     }
   }
-  auto end = std::chrono::high_resolution_clock::now();
-  std::cout << "perc bern\n\t";perc_bern.print_probabilities();
+  auto end = std::chrono::high_resolution_clock::now(); 
   ret.bernoulli_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
   std::cout << "\n";
 
   std::cout << "Now running poisson test\nv";
-  for (_uint i = 0; i < t_max/INTERVAL; ++i) {
+  for (_uint i = 0; i < t_max / interval + 1; ++i) {
     std::cout << " ";
   }
   std::cout << "v\n ";
   begin = std::chrono::high_resolution_clock::now();
   for (_uint i = 0; i < t_max; ++i) {
     perc_pois.update(generator);
-    if (i % INTERVAL == 0) {
+    if (i % interval == 0) {
       std::cout << "#" << std::flush;
     }
   }
-  end = std::chrono::high_resolution_clock::now();
-  std::cout << "perc pois\n\t";perc_pois.print_probabilities();
+  end = std::chrono::high_resolution_clock::now(); 
   ret.poisson_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
   std::cout << "\n";
 
   std::cout << "Now running old-binomial test\nv";
-  for (_uint i = 0; i < t_max/INTERVAL; ++i) {
+  for (_uint i = 0; i < t_max / interval + 1; ++i) {
     std::cout << " ";
   }
   std::cout << "v\n ";
   begin = std::chrono::high_resolution_clock::now();
   for (_uint i = 0; i < t_max; ++i) {
     perc_bin_old.update(generator);
-    if (i % INTERVAL == 0) {
+    if (i % interval == 0) {
       std::cout << "#" << std::flush;
     }
   }
   end = std::chrono::high_resolution_clock::now();
-  std::cout << "perc bino\n\t";perc_bin_old.print_probabilities();
   ret.binomial_old_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
   std::cout << "\n";
 
   std::cout << "Now running new-binomial test\nv";
-  for (_uint i = 0; i < t_max/INTERVAL; ++i) {
+  for (_uint i = 0; i < t_max / interval + 1; ++i) {
     std::cout << " ";
   }
   std::cout << "v\n ";
   begin = std::chrono::high_resolution_clock::now();
   for (_uint i = 0; i < t_max; ++i) {
     perc_bin_new.update(generator);
-    if (i % INTERVAL == 0) {
+    if (i % interval == 0) {
       std::cout << "#" << std::flush;
     }
   }
   end = std::chrono::high_resolution_clock::now();
-  std::cout << "perc binn\n\t";perc_bin_new.print_probabilities();
   ret.binomial_new_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
   std::cout << "\n";
 
   std::cout << "Now running poisson finite digit test\nv";
-  for (_uint i = 0; i < t_max/INTERVAL; ++i) {
+  for (_uint i = 0; i < t_max / interval + 1; ++i) {
     std::cout << " ";
   }
   std::cout << "v\n ";
   begin = std::chrono::high_resolution_clock::now();
   for (_uint i = 0; i < t_max; ++i) {
     perc_hyp.update(generator);
-    if (i % INTERVAL == 0) {
+    if (i % interval == 0) {
       std::cout << "#" << std::flush;
     }
   }
   end = std::chrono::high_resolution_clock::now();
-  std::cout << "perc hyp\n\t";perc_hyp.print_probabilities();
   ret.hybrid_poisson_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
   std::cout << "\n";
 
   std::cout << "Now running binomial finite digit test\nv";
-  for (_uint i = 0; i < t_max/INTERVAL; ++i) {
+  for (_uint i = 0; i < t_max / interval + 1; ++i) {
     std::cout << " ";
   }
   std::cout << "v\n ";
   begin = std::chrono::high_resolution_clock::now();
   for (_uint i = 0; i < t_max; ++i) {
     perc_hyb.update(generator);
-    if (i % INTERVAL == 0) {
+    if (i % interval == 0) {
       std::cout << "#" << std::flush;
     }
   }
   end = std::chrono::high_resolution_clock::now();
-  std::cout << "perc hyb\n\t";perc_hyb.print_probabilities();
   ret.hybrid_binomial_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
   std::cout << "\n";
 

@@ -46,7 +46,7 @@ with open(fname) as csvfile:
             for i, x in enumerate(row):
                 if (i-net_offset) % span == occ_offset and (i-net_offset)/span < n_tests:
                     occ_arrs[int((i-net_offset)/span)].append(float(x))
-                if (i-occ_offset) % span == rho_offset and (i-net_offset)/span < n_tests:
+                if (i-net_offset) % span == rho_offset and (i-net_offset)/span < n_tests:
                     rho_arrs[int((i-net_offset)/span)].append(float(x))
 
 n = len(occ_arrs[0])
@@ -90,8 +90,8 @@ plt.title("Average occupation density vs time")
 plt.xlabel("time step")
 plt.ylabel("rho(t)")
 plt.legend(names)
-plt.xlim([1.0, 110.0])
-plt.ylim([0.1, 1.5])
+#plt.xlim([1.0, 110.0])
+#plt.ylim([0.1, 1.5])
 plt.show()
 plt.clf()
 
@@ -102,8 +102,8 @@ plt.title("Average occupation number vs time")
 plt.xlabel("time step")
 plt.ylabel("n(t)")
 plt.legend(names)
-plt.xlim([1.0, 110.0])
-plt.ylim([0.1, 50])
+#plt.xlim([1.0, 110.0])
+#plt.ylim([0.1, 50])
 plt.show()
 
 '''plt.loglog(test_time, test_occ);

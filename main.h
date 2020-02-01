@@ -16,7 +16,7 @@
 #define NUM_STEPS	32768
 #define PROBABILITY	0.01
 #define COL_WIDTH	80
-#define INTERVAL	500
+#define STATUS_BAR_LEN	40
 
 #define N_STARS		200
 
