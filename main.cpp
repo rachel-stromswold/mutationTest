@@ -35,8 +35,8 @@ struct TimingStats {
   unsigned poisson_total = 0;
   unsigned binomial_old_total = 0;
   unsigned binomial_new_total = 0;
-  double hybrid_poisson_total = 0;
-  double hybrid_binomial_total = 0;
+  unsigned hybrid_poisson_total = 0;
+  unsigned hybrid_binomial_total = 0;
 
   double bernoulli_avg = 0;
   double poisson_avg = 0;
@@ -44,6 +44,15 @@ struct TimingStats {
   double binomial_new_avg = 0;
   double hybrid_poisson_avg = 0;
   double hybrid_binomial_avg = 0;
+
+  void calc_averages(_uint n_trials) {
+    bernoulli_avg = (double)bernoulli_total / n_trials;
+    poisson_avg = (double)poisson_total / n_trials;
+    binomial_old_avg = (double)binomial_old_total / n_trials;
+    binomial_new_avg = (double)binomial_new_total / n_trials;
+    hybrid_poisson_avg = (double)hybrid_poisson_total / n_trials;
+    hybrid_binomial_avg = (double)hybrid_binomial_total / n_trials;
+  }
 };
 
 TimingStats test_non_hybrid(unsigned n_trials, unsigned len, double p, unsigned seed=DEF_SEED) {
@@ -52,98 +61,58 @@ TimingStats test_non_hybrid(unsigned n_trials, unsigned len, double p, unsigned 
 
   //create the return value
   TimingStats ret;
-  //initialize the random samplers
-  RepeatBernoulli bern(len, p);
-  BinomialShuffleOld bin_old(len, p);
-  BinomialShufflePrecompute bin_new(len, p);
-  PoissonOr poisson(len, p);
-  FiniteDigit<BinomialShufflePrecompute> digit_bin(len, p);
-  FiniteDigit<PoissonOr> digit_poi(len, p);
-  /*BinomialShufflePrecompute bin_correction(len, digit.get_correction());
-  PoissonOr poi_correction(len, digit.get_correction());*/
-  //initialize the data storage
-  std::vector<unsigned int> ber_test(n_trials);
-  std::vector<unsigned int> poisson_test(n_trials);
-  std::vector<unsigned int> bin_test_old(n_trials);
-  std::vector<unsigned int> bin_test_new(n_trials);
-  std::vector<unsigned int> digit_test(n_trials);
+  //initialize the random samplers and the data storage
+  SampleData<RepeatBernoulli> test_bern(len, p, n_trials);
+    TimingTracker<SampleData<RepeatBernoulli>, std::mt19937> track_bern(n_trials);
+  SampleData<PoissonOr> test_pois(len, p, n_trials);
+    TimingTracker<SampleData<PoissonOr>, std::mt19937> track_pois(n_trials);
+  SampleData<BinomialShuffleOld> test_bin_old(len, p, n_trials);
+    TimingTracker<SampleData<BinomialShuffleOld>, std::mt19937> track_bin_old(n_trials);
+  SampleData<BinomialShufflePrecompute> test_bin_new(len, p, n_trials);
+    TimingTracker<SampleData<BinomialShufflePrecompute>, std::mt19937> track_bin_new(n_trials);
+  SampleData<FiniteDigit<PoissonOr>> test_hyp(len, p, n_trials);
+    TimingTracker<SampleData<FiniteDigit<PoissonOr>>, std::mt19937> track_hyp(n_trials);
+  SampleData<FiniteDigit<BinomialShufflePrecompute>> test_hyb(len, p, n_trials);
+    TimingTracker<SampleData<FiniteDigit<BinomialShufflePrecompute>>, std::mt19937> track_hyb(n_trials);
 
-  //perform the test using the traditional method, store each mutation in the bernTest array
-  auto begin = std::chrono::high_resolution_clock::now();
-  for (unsigned i = 0; i < n_trials; ++i) {
-    ber_test[i] = bern(generator);
-  }
-  auto end = std::chrono::high_resolution_clock::now();
-  ret.bernoulli_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
-  
-  //initialize the clock for the poisson method
-  begin = std::chrono::high_resolution_clock::now();
-  for (unsigned i = 0; i < n_trials; ++i) {
-    poisson_test[i] = poisson(generator);
-  }
-  end = std::chrono::high_resolution_clock::now();
-  ret.poisson_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
-
-  //initialize the clock for the old binomial shuffle
-  begin = std::chrono::high_resolution_clock::now();
-  for (unsigned i = 0; i < n_trials; ++i) {
-    bin_test_old[i] = bin_old(generator);
-  }
-  end = std::chrono::high_resolution_clock::now();
-  ret.binomial_old_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
-  
-  //initialize the clock for the new binomial shuffle
-  begin = std::chrono::high_resolution_clock::now();
-  for (unsigned i = 0; i < n_trials; ++i) {
-    bin_test_new[i] = bin_new(generator);
-  }
-  end = std::chrono::high_resolution_clock::now();
-  ret.binomial_new_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
-
-  //initialize the clock for the finite digit method (poisson correction)
-  begin = std::chrono::high_resolution_clock::now();
-  for (unsigned i = 0; i < n_trials; ++i) {
-    digit_test[i] = digit_poi(generator);
-    //digit_test[i] |= poi_correction(generator);
-  }
-  end = std::chrono::high_resolution_clock::now();
-  ret.hybrid_poisson_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
-
-  //initialize the clock for the finite digit method (new binomial correction)
-  begin = std::chrono::high_resolution_clock::now();
-  for (unsigned i = 0; i < n_trials; ++i) {
-    digit_test[i] = digit_bin(generator);
-    //digit_test[i] |= bin_correction(generator);
-  }
-  end = std::chrono::high_resolution_clock::now();
-  ret.hybrid_binomial_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
- 
+  std::cout << "Now running bernoulli test\n";
+  ret.bernoulli_total = track_bern.run(test_bern, generator);
+  std::cout << "Now running poisson test\n";
+  ret.poisson_total = track_pois.run(test_pois, generator);
+  std::cout << "Now running old-binomial test\n";
+  ret.binomial_old_total = track_bin_old.run(test_bin_old, generator);
+  std::cout << "Now running new-binomial test\n";
+  ret.binomial_new_total = track_bin_new.run(test_bin_new, generator); 
+  std::cout << "Now running poisson finite digit test\n";
+  ret.hybrid_poisson_total = track_hyp.run(test_hyp, generator); 
+  std::cout << "Now running binomial finite digit test\n";
+  ret.hybrid_binomial_total = track_hyb.run(test_hyb, generator); 
 
   std::ofstream dout;
   dout.open("dat.csv");
   //number to track how many ones there are to go in ascending order
   std::map<unsigned, OccurrenceCounter> histogram;
   for (unsigned i = 0; i < n_trials; ++i) {
-    if (histogram.count(ber_test[i]) == 0) {
-      histogram[ber_test[i]] = OccurrenceCounter();
+    if (histogram.count(test_bern.get(i)) == 0) {
+      histogram[test_bern.get(i)] = OccurrenceCounter();
     }
-    if (histogram.count(poisson_test[i]) == 0) {
-      histogram[poisson_test[i]] = OccurrenceCounter();
+    if (histogram.count(test_pois.get(i)) == 0) {
+      histogram[test_pois.get(i)] = OccurrenceCounter();
     }
-    if (histogram.count(bin_test_old[i]) == 0) {
-      histogram[bin_test_old[i]] = OccurrenceCounter();
+    if (histogram.count(test_bin_old.get(i)) == 0) {
+      histogram[test_bin_old.get(i)] = OccurrenceCounter();
     }
-    if (histogram.count(bin_test_new[i]) == 0) {
-      histogram[bin_test_new[i]] = OccurrenceCounter();
+    if (histogram.count(test_bin_new.get(i)) == 0) {
+      histogram[test_bin_new.get(i)] = OccurrenceCounter();
     }
-    if (histogram.count(digit_test[i]) == 0) {
-      histogram[digit_test[i]] = OccurrenceCounter();
+    if (histogram.count(test_hyb.get(i)) == 0) {
+      histogram[test_hyb.get(i)] = OccurrenceCounter();
     }
-    histogram[ber_test[i]].bernoulli_occurrences += 1;
-    histogram[poisson_test[i]].poisson_occurrences += 1;
-    histogram[bin_test_old[i]].binomial_old_occurrences += 1;
-    histogram[bin_test_new[i]].binomial_new_occurrences += 1;
-    histogram[digit_test[i]].digit_occurrences += 1;
+    histogram[test_bern.get(i)].bernoulli_occurrences += 1;
+    histogram[test_pois.get(i)].poisson_occurrences += 1;
+    histogram[test_bin_old.get(i)].binomial_old_occurrences += 1;
+    histogram[test_bin_new.get(i)].binomial_new_occurrences += 1;
+    histogram[test_hyb.get(i)].digit_occurrences += 1;
   }
   dout << "result,bernoulli,poisson,binomial old,binomial new,hybrid poisson\n";
   for (auto it = histogram.begin(); it != histogram.end(); ++it) {
@@ -157,15 +126,16 @@ TimingStats test_non_hybrid(unsigned n_trials, unsigned len, double p, unsigned 
   dout.close();
 
   //calculate averages
-  ret.bernoulli_avg = (double)ret.bernoulli_total / n_trials;
-  ret.poisson_avg = (double)ret.poisson_total / n_trials;
-  ret.binomial_old_avg = (double)ret.binomial_old_total / n_trials;
-  ret.binomial_new_avg = (double)ret.binomial_new_total / n_trials;
-  ret.hybrid_poisson_avg = (double)ret.hybrid_poisson_total / n_trials;
-  ret.hybrid_binomial_avg = (double)ret.hybrid_binomial_total / n_trials;
-
+  ret.calc_averages(n_trials);
   return ret;
 }
+
+typedef PercolationTracker<RepeatBernoulli> PercBern;
+typedef PercolationTracker<PoissonOr> PercPois;
+typedef PercolationTracker<BinomialShuffleOld> PercBinOld;
+typedef PercolationTracker<BinomialShufflePrecompute> PercBinNew;
+typedef PercolationTracker<FiniteDigit<PoissonOr>> PercHyp;
+typedef PercolationTracker<FiniteDigit<BinomialShufflePrecompute>> PercHyb;
 
 TimingStats run_percolation(unsigned n_trials, unsigned len, double p, bool relax, unsigned t_max=10000, unsigned seed=DEF_SEED) {
   std::mt19937 generator;
@@ -180,116 +150,34 @@ TimingStats run_percolation(unsigned n_trials, unsigned len, double p, bool rela
   double hybrid_poisson_total = 0;
   double hybrid_binomial_total = 0;
 
-  PercolationTracker<RepeatBernoulli> perc_bern(n_trials, p, relax, len, t_max);
-  PercolationTracker<PoissonOr> perc_pois(n_trials, p, relax, len, t_max);
-  PercolationTracker<BinomialShuffleOld> perc_bin_old(n_trials, p, relax, len, t_max);
-  PercolationTracker<BinomialShufflePrecompute> perc_bin_new(n_trials, p, relax, len, t_max);
-  PercolationTracker<FiniteDigit<PoissonOr>> perc_hyp(n_trials, p, relax, len, t_max);
-  PercolationTracker<FiniteDigit<BinomialShufflePrecompute>> perc_hyb(n_trials, p, relax, len, t_max);
+  PercBern perc_bern(n_trials, p, relax, len, t_max);
+    TimingTracker<PercBern, std::mt19937> track_bern(t_max);
+  PercPois perc_pois(n_trials, p, relax, len, t_max);
+    TimingTracker<PercPois, std::mt19937> track_pois(t_max);
+  PercBinOld perc_bin_old(n_trials, p, relax, len, t_max);
+    TimingTracker<PercBinOld, std::mt19937> track_bin_old(t_max);
+  PercBinNew perc_bin_new(n_trials, p, relax, len, t_max);
+    TimingTracker<PercBinNew, std::mt19937> track_bin_new(t_max);
+  PercHyp perc_hyp(n_trials, p, relax, len, t_max);
+    TimingTracker<PercHyp, std::mt19937> track_hyp(t_max);
+  PercHyb perc_hyb(n_trials, p, relax, len, t_max);
+    TimingTracker<PercHyb, std::mt19937> track_hyb(t_max);
 
-  _uint interval = (t_max + STATUS_BAR_LEN-1) / STATUS_BAR_LEN;
-  std::cout << "Now running bernoulli test\nv";
-  for (_uint i = 0; i < t_max / interval + 1; ++i) {
-    std::cout << " ";
-  }
-  std::cout << "v\n ";
-  auto begin = std::chrono::high_resolution_clock::now();
-  for (_uint i = 0; i < t_max; ++i) {
-    perc_bern.update(generator);
-    if (i % interval == 0) {
-      std::cout << "#" << std::flush;
-    }
-  }
-  auto end = std::chrono::high_resolution_clock::now(); 
-  ret.bernoulli_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
-  std::cout << "\n";
+  
+  std::cout << "Now running bernoulli percolation\n";
+  ret.bernoulli_total = track_bern.run(perc_bern, generator);
+  std::cout << "Now running poisson percolation\n";
+  ret.poisson_total = track_pois.run(perc_pois, generator);
+  std::cout << "Now running old-binomial percolation\n";
+  ret.binomial_old_total = track_bin_old.run(perc_bin_old, generator);
+  std::cout << "Now running new-binomial percolation\n";
+  ret.binomial_new_total = track_bin_new.run(perc_bin_new, generator); 
+  std::cout << "Now running poisson finite digit percolation\n";
+  ret.hybrid_poisson_total = track_hyp.run(perc_hyp, generator); 
+  std::cout << "Now running binomial finite digit percolation\n";
+  ret.hybrid_binomial_total = track_hyb.run(perc_hyb, generator);
 
-  std::cout << "Now running poisson test\nv";
-  for (_uint i = 0; i < t_max / interval + 1; ++i) {
-    std::cout << " ";
-  }
-  std::cout << "v\n ";
-  begin = std::chrono::high_resolution_clock::now();
-  for (_uint i = 0; i < t_max; ++i) {
-    perc_pois.update(generator);
-    if (i % interval == 0) {
-      std::cout << "#" << std::flush;
-    }
-  }
-  end = std::chrono::high_resolution_clock::now(); 
-  ret.poisson_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
-  std::cout << "\n";
-
-  std::cout << "Now running old-binomial test\nv";
-  for (_uint i = 0; i < t_max / interval + 1; ++i) {
-    std::cout << " ";
-  }
-  std::cout << "v\n ";
-  begin = std::chrono::high_resolution_clock::now();
-  for (_uint i = 0; i < t_max; ++i) {
-    perc_bin_old.update(generator);
-    if (i % interval == 0) {
-      std::cout << "#" << std::flush;
-    }
-  }
-  end = std::chrono::high_resolution_clock::now();
-  ret.binomial_old_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
-  std::cout << "\n";
-
-  std::cout << "Now running new-binomial test\nv";
-  for (_uint i = 0; i < t_max / interval + 1; ++i) {
-    std::cout << " ";
-  }
-  std::cout << "v\n ";
-  begin = std::chrono::high_resolution_clock::now();
-  for (_uint i = 0; i < t_max; ++i) {
-    perc_bin_new.update(generator);
-    if (i % interval == 0) {
-      std::cout << "#" << std::flush;
-    }
-  }
-  end = std::chrono::high_resolution_clock::now();
-  ret.binomial_new_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
-  std::cout << "\n";
-
-  std::cout << "Now running poisson finite digit test\nv";
-  for (_uint i = 0; i < t_max / interval + 1; ++i) {
-    std::cout << " ";
-  }
-  std::cout << "v\n ";
-  begin = std::chrono::high_resolution_clock::now();
-  for (_uint i = 0; i < t_max; ++i) {
-    perc_hyp.update(generator);
-    if (i % interval == 0) {
-      std::cout << "#" << std::flush;
-    }
-  }
-  end = std::chrono::high_resolution_clock::now();
-  ret.hybrid_poisson_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
-  std::cout << "\n";
-
-  std::cout << "Now running binomial finite digit test\nv";
-  for (_uint i = 0; i < t_max / interval + 1; ++i) {
-    std::cout << " ";
-  }
-  std::cout << "v\n ";
-  begin = std::chrono::high_resolution_clock::now();
-  for (_uint i = 0; i < t_max; ++i) {
-    perc_hyb.update(generator);
-    if (i % interval == 0) {
-      std::cout << "#" << std::flush;
-    }
-  }
-  end = std::chrono::high_resolution_clock::now();
-  ret.hybrid_binomial_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
-  std::cout << "\n";
-
-  ret.bernoulli_avg = (double)ret.bernoulli_total / n_trials;
-  ret.poisson_avg = (double)ret.poisson_total / n_trials;
-  ret.binomial_old_avg = (double)ret.binomial_old_total / n_trials;
-  ret.binomial_new_avg = (double)ret.binomial_new_total / n_trials;
-  ret.hybrid_poisson_avg = (double)ret.hybrid_poisson_total / n_trials;
-  ret.hybrid_binomial_avg = (double)ret.hybrid_binomial_total / n_trials;
+  ret.calc_averages(n_trials);
 
   std::vector<double> time = perc_bern.get_time_arr();
   _uint n = time.size();
@@ -356,91 +244,46 @@ TimingStats test_probabilities(unsigned n_trials, unsigned len, double p, unsign
   generator.seed(seed);
   TimingStats ret;
 
-  RepeatBernoulli bern(len, p);
-  PoissonOr pois(len, p);
-  BinomialShuffleOld bin_old(len, p);
-  BinomialShufflePrecompute bin_new(len, p, 4, 32);
-  FiniteDigit<PoissonOr> hyp(len, p);
-  FiniteDigit<BinomialShufflePrecompute> hyb(len, p);
+  BitsData<RepeatBernoulli> bern(len, p);
+    TimingTracker<BitsData<RepeatBernoulli>, std::mt19937> track_bern(n_trials);
+  BitsData<PoissonOr> pois(len, p);
+    TimingTracker<BitsData<PoissonOr>, std::mt19937> track_pois(n_trials);
+  BitsData<BinomialShuffleOld> bin_old(len, p);
+    TimingTracker<BitsData<BinomialShuffleOld>, std::mt19937> track_bin_old(n_trials);
+  BitsData<BinomialShufflePrecompute> bin_new(len, p);
+    TimingTracker<BitsData<BinomialShufflePrecompute>, std::mt19937> track_bin_new(n_trials);
+  BitsData<FiniteDigit<PoissonOr>> hyp(len, p);
+    TimingTracker<BitsData<FiniteDigit<PoissonOr>>, std::mt19937> track_hyp(n_trials);
+  BitsData<FiniteDigit<BinomialShufflePrecompute>> hyb(len, p);
+    TimingTracker<BitsData<FiniteDigit<BinomialShufflePrecompute>>, std::mt19937> track_hyb(n_trials);
 
-  std::vector<unsigned> bern_arr(len, 0);
-  std::vector<unsigned> pois_arr(len, 0);
-  std::vector<unsigned> bin_old_arr(len, 0);
-  std::vector<unsigned> bin_new_arr(len, 0);
-  std::vector<unsigned> hyp_arr(len, 0);
-  std::vector<unsigned> hyb_arr(len, 0);
+  std::cout << "Now running bernoulli probabilities\n";
+  ret.bernoulli_total = track_bern.run(bern, generator);
+  std::cout << "Now running poisson probabilities\n";
+  ret.poisson_total = track_pois.run(pois, generator);
+  std::cout << "Now running old-binomial probabilities\n";
+  ret.binomial_old_total = track_bin_old.run(bin_old, generator);
+  std::cout << "Now running new-binomial probabilities\n";
+  ret.binomial_new_total = track_bin_new.run(bin_new, generator); 
+  std::cout << "Now running poisson finite digit probabilities\n";
+  ret.hybrid_poisson_total = track_hyp.run(hyp, generator); 
+  std::cout << "Now running binomial finite digit probabilities\n";
+  ret.hybrid_binomial_total = track_hyb.run(hyb, generator);
 
-  _uint sample = 0;
-  for (_uint i = 0; i < n_trials; ++i) {
-    sample = bern(generator);
-    update_counts_array(bern_arr, sample, n_trials, len);
-    sample = pois(generator);
-    update_counts_array(pois_arr, sample, n_trials, len);
-    sample = bin_old(generator);
-    update_counts_array(bin_old_arr, sample, n_trials, len);
-    sample = bin_new(generator);
-    update_counts_array(bin_new_arr, sample, n_trials, len);
-    sample = hyp(generator);
-    update_counts_array(hyp_arr, sample, n_trials, len);
-    sample = hyb(generator);
-    update_counts_array(hyb_arr, sample, n_trials, len);
-  }
-
-  double upper, lower;
   std::cout << "bernoulli:\n";
-  for (_uint j = 0; j < len; ++j) {
-    Range r = find_uncertainty(bern_arr[j], n_trials);
-    std::cout << "\tp_" << j << "=" << r.avg() << "\u00B1" << r.gap()/2;
-    if (r.max < p || r.min > p) {
-      std::cout << "!";
-    }
-    std::cout << "\n";
-  }
+  bern.print_statistics(p);
   std::cout << "poisson:\n";
-  for (_uint j = 0; j < len; ++j) {
-    Range r = find_uncertainty(pois_arr[j], n_trials);
-    std::cout << "\tp_" << j << "=" << r.avg() << "\u00B1" << r.gap()/2;
-    if (r.max < p || r.min > p) {
-      std::cout << "!";
-    }
-    std::cout << "\n";
-  }
+  pois.print_statistics(p);
   std::cout << "binomial old:\n";
-  for (_uint j = 0; j < len; ++j) {
-    Range r = find_uncertainty(bin_old_arr[j], n_trials);
-    std::cout << "\tp_" << j << "=" << r.avg() << "\u00B1" << r.gap()/2;
-    if (r.max < p || r.min > p) {
-      std::cout << "!";
-    }
-    std::cout << "\n";
-  }
+  bin_old.print_statistics(p);
   std::cout << "binomial new:\n";
-  for (_uint j = 0; j < len; ++j) {
-    Range r = find_uncertainty(bin_new_arr[j], n_trials);
-    std::cout << "\tp_" << j << "=" << r.avg() << "\u00B1" << r.gap()/2;
-    if (r.max < p || r.min > p) {
-      std::cout << "!";
-    }
-    std::cout << "\n";
-  }
+  bin_new.print_statistics(p);
   std::cout << "finite digit (new binomial):\n";
-  for (_uint j = 0; j < len; ++j) {
-    Range r = find_uncertainty(hyb_arr[j], n_trials);
-    std::cout << "\tp_" << j << "=" << r.avg() << "\u00B1" << r.gap()/2;
-    if (r.max < p || r.min > p) {
-      std::cout << "!";
-    }
-    std::cout << "\n";
-  }
+  hyb.print_statistics(p);
   std::cout << "finite digit (poisson):\n";
-  for (_uint j = 0; j < len; ++j) {
-    Range r = find_uncertainty(hyp_arr[j], n_trials);
-    std::cout << "\tp_" << j << "=" << r.avg() << "\u00B1" << r.gap()/2;
-    if (r.max < p || r.min > p) {
-      std::cout << "!";
-    }
-    std::cout << "\n";
-  }
+  hyp.print_statistics(p);
+
+  ret.calc_averages(n_trials);
   return ret;
 }
 
@@ -529,17 +372,17 @@ int main(int argc, char** argv) {
 	      << " " << timings.hybrid_poisson_total << " " << timings.hybrid_poisson_avg 
 	      << " " << timings.hybrid_binomial_total << " " << timings.hybrid_binomial_avg << std::endl;
   } else {
-    std::cout << "Bernoulli time:       " << timings.bernoulli_total
-	      << " \tavg: " << timings.bernoulli_avg << std::endl
-	      << "poisson time:         " << timings.poisson_total
-	      << " \tavg: " << timings.poisson_avg << std::endl
-	      << "binomial time (old):  " << timings.binomial_old_total
-	      << " \tavg: " << timings.binomial_old_avg << std::endl
-	      << "binomial time (new):  " << timings.binomial_new_total
-	      << " \tavg: " << timings.binomial_new_avg << std::endl
-	      << "hybrid poisson time:  " << timings.hybrid_poisson_total
-	      << " \tavg: " << timings.hybrid_poisson_avg << std::endl
-	      << "hybrid binomial time: " << timings.hybrid_binomial_total
-	      << " \tavg: " << timings.hybrid_binomial_avg << std::endl;
+    std::cout << "Bernoulli time:       " << int_fmt(timings.bernoulli_total, D_LEN)
+	      << " \tavg: " << int_fmt(timings.bernoulli_avg, D_LEN) << std::endl
+	      << "poisson time:         " << int_fmt(timings.poisson_total, D_LEN)
+	      << " \tavg: " << int_fmt(timings.poisson_avg, D_LEN) << std::endl
+	      << "binomial time (old):  " << int_fmt(timings.binomial_old_total, D_LEN)
+	      << " \tavg: " << int_fmt(timings.binomial_old_avg, D_LEN) << std::endl
+	      << "binomial time (new):  " << int_fmt(timings.binomial_new_total, D_LEN)
+	      << " \tavg: " << int_fmt(timings.binomial_new_avg, D_LEN) << std::endl
+	      << "hybrid poisson time:  " << int_fmt(timings.hybrid_poisson_total, D_LEN)
+	      << " \tavg: " << int_fmt(timings.hybrid_poisson_avg, D_LEN) << std::endl
+	      << "hybrid binomial time: " << int_fmt(timings.hybrid_binomial_total, D_LEN)
+	      << " \tavg: " << int_fmt(timings.hybrid_binomial_avg, D_LEN) << std::endl;
   }
 }
