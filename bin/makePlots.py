@@ -12,8 +12,8 @@ from scipy import stats
 N = 100
 N_GENERATORS = 5
 
+TRIAL_NUM = 100
 #TRIAL_NUM = 100000
-TRIAL_NUM = 100000
 P = 0.6447
 plot_traditional = False
 plot_poisson = False
@@ -29,8 +29,8 @@ if len(sys.argv) > 2:
     fname = sys.argv[2]
 
 seedarr=[14983, 36709, 44207, 65604, 53050, 42595, 19764, 38077, 66747, 39341, 55352, 52370, 97828, 46377, 47277, 80069, 29518, 32172, 15958, 27783]
-#lenarr=[8, 12, 16, 24, 32, 48, 64]
-lenarr=[32, 64]
+lenarr=[8, 12, 16, 24, 32, 48, 64]
+#lenarr=[32, 64]
 
 class Histogram:
     def __init__(self):
@@ -134,27 +134,30 @@ for k, l in enumerate(lenarr):
         if (pidt == 0):
             os.dup2(w_fd, 1)
             #P = 1.0/float(l)
-            args = ["./main", "-l", str(l), "-s", str(s), "-n", str(TRIAL_NUM), "-p", str(P), "-q", "-d"]
+            args = ["./main", "-l", str(l), "-s", str(s), "-n", str(TRIAL_NUM), "-p", str(P), "-q", "--distribution"]
             os.execv("./main", args)
         else:
             os.wait()
             os.close(w_fd)
             out = str(os.read(r_fd, 1000))
             datstr = out.rstrip()
-            lst = datstr.split()
-            if i < N:
-                berndat[i] = float(lst[1].strip('\n \t'))
-                poissdat[i] = float(lst[3].strip('\n \t'))
-                bindat[i] = float(lst[5].strip('\n \t'))
-                bindat_new[i] = float(lst[7].strip('\n n\\\'\t'))
-                hyp_dat[i] = float(lst[9].strip('\n n\\\'\t'))
-                hyb_dat[i] = float(lst[11].strip('\n n\\\'\t'))
-                berntimes[0][k] += berndat[i]
-                poisstimes[0][k] += poissdat[i]
-                bintimes[0][k] += bindat[i]
-                bintimes_new[0][k] += bindat_new[i]
-                hyp_times[0][k] += hyp_dat[i]
-                hyb_times[0][k] += hyb_dat[i]
+            loc = datstr.find('time:')
+            if loc > 0:
+                print(datstr[loc:])
+                lst = datstr[loc:].split(' ')
+                if i < N:
+                    berndat[i] = float(lst[1].strip('\n \t'))
+                    poissdat[i] = float(lst[3].strip('\n \t'))
+                    bindat[i] = float(lst[5].strip('\n \t'))
+                    bindat_new[i] = float(lst[7].strip('\n n\\\'\t'))
+                    hyp_dat[i] = float(lst[9].strip('\n n\\\'\t'))
+                    hyb_dat[i] = float(lst[11].strip('\n n\\\'\t'))
+                    berntimes[0][k] += berndat[i]
+                    poisstimes[0][k] += poissdat[i]
+                    bintimes[0][k] += bindat[i]
+                    bintimes_new[0][k] += bindat_new[i]
+                    hyp_times[0][k] += hyp_dat[i]
+                    hyb_times[0][k] += hyb_dat[i]
                 i+=1
             os.close(r_fd)
             if l == 4:

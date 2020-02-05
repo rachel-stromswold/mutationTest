@@ -365,12 +365,12 @@ int main(int argc, char** argv) {
     timings = test_probabilities(n_trials, len, p, seed);
   }
   if (silent) {
-    std::cout << timings.bernoulli_total  << " " << timings.bernoulli_avg
-	      << " " << timings.poisson_total << " " << timings.poisson_avg
-	      << " " << timings.binomial_old_total << " " << timings.binomial_old_avg
-	      << " " << timings.binomial_new_total << " " << timings.binomial_new_avg
-	      << " " << timings.hybrid_poisson_total << " " << timings.hybrid_poisson_avg 
-	      << " " << timings.hybrid_binomial_total << " " << timings.hybrid_binomial_avg << std::endl;
+    std::cout << "time: " << timings.bernoulli_total  << " " << timings.bernoulli_avg
+              << " " << timings.poisson_total << " " << timings.poisson_avg
+              << " " << timings.binomial_old_total << " " << timings.binomial_old_avg
+              << " " << timings.binomial_new_total << " " << timings.binomial_new_avg
+              << " " << timings.hybrid_poisson_total << " " << timings.hybrid_poisson_avg 
+              << " " << timings.hybrid_binomial_total << " " << timings.hybrid_binomial_avg << std::endl;
   } else {
     std::cout << "Bernoulli time:       " << int_fmt(timings.bernoulli_total, D_LEN)
 	      << " \tavg: " << int_fmt(timings.bernoulli_avg, D_LEN) << std::endl
