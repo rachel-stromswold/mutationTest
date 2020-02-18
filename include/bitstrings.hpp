@@ -343,7 +343,7 @@ public:
       invert = 0;
     }
     
-    if (n > group_size) {
+    if (n > group_size | p_ != p) {
       n = group_size;
       bin = std::binomial_distribution<_uint>(n, p_);
     }
