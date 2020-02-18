@@ -105,7 +105,8 @@ class Histogram:
         for tick in ax.get_xticklabels():
             tick.set_rotation(45)
         ax.legend()
-        plt.show()
+        #plt.show()
+        plt.savefig("histogram.png")
         plt.clf()
 
 berndat = [0 for i in range(N)]
@@ -254,7 +255,8 @@ for k, l in enumerate(lenarr):
         height = bar.get_height()
         ax.text(bar.get_x() + width/2., height + 3, '%d' % mbps_list[i], ha='center', va='bottom')
     ax.legend()
-    plt.show()
+    #plt.show()
+    plt.savefig("speed_l_{}.png".format(l))
     plt.clf()
 
     wstr = str(l)+","+str(berntimes[0][k])+","+str(bintimes[0][k])+","+str(bintimes_new[0][k])+"\n"
@@ -357,4 +359,4 @@ plt.legend(loc='upper left')
 plt.xlim([0, 70])
 plt.ylim(bottom=0)
 plt.savefig('time_vs_length.png')
-plt.show()
+#plt.show()

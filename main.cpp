@@ -188,8 +188,8 @@ TimingStats run_percolation(unsigned n_trials, unsigned len, double p, bool rela
   std::vector<double> occ_fitted(n);
   std::vector<double> rho_fitted(n);
 
-  double theta_fit, theta_cov, theta_sumsq_res, theta_r2, occ_mean, occ_ss;
-  double beta_fit, beta_cov, beta_sumsq_res, beta_r2, rho_mean, rho_ss;
+  //double theta_fit, theta_cov, theta_sumsq_res, theta_r2, occ_mean, occ_ss;
+  //double beta_fit, beta_cov, beta_sumsq_res, beta_r2, rho_mean, rho_ss;
   std::ofstream dout;
   dout.open("occupations.csv");
   dout << "time,n(t),rho(t),n_surviving\n";
@@ -201,8 +201,8 @@ TimingStats run_percolation(unsigned n_trials, unsigned len, double p, bool rela
     ln_time[t] = (time[t] <= 0)? 0 : log(time[t]);
     ln_occ[t] = log(avg_n);
     ln_rho[t] = log(avg_rho);
-    occ_mean += ln_occ[t] / n;
-    rho_mean += ln_rho[t] / n;
+    //occ_mean += ln_occ[t] / n;
+    //rho_mean += ln_rho[t] / n;
     dout << t << ","
          << avg_n << "," << avg_rho << "," << avg_survivors << ","
          << perc_bern.get_n(t) << "," << perc_bern.get_rho(t) << "," << perc_bern.get_survivors(t) << ","
@@ -214,10 +214,10 @@ TimingStats run_percolation(unsigned n_trials, unsigned len, double p, bool rela
 	 << std::endl;
   }
 
-  gsl_fit_mul(ln_time, 1, ln_occ, 1, time.size(), &theta_fit, &theta_cov, &theta_sumsq_res);
-  gsl_fit_mul(ln_time, 1, ln_rho, 1, time.size(), &beta_fit, &beta_cov, &beta_sumsq_res);
+  //gsl_fit_mul(ln_time, 1, ln_occ, 1, time.size(), &theta_fit, &theta_cov, &theta_sumsq_res);
+  //gsl_fit_mul(ln_time, 1, ln_rho, 1, time.size(), &beta_fit, &beta_cov, &beta_sumsq_res);
 
-  for (_uint i = 0; i < n; ++i) {
+  /*for (_uint i = 0; i < n; ++i) {
     occ_ss += pow(ln_occ[i] - occ_mean, 2);
     rho_ss += pow(ln_rho[i] - rho_mean, 2);
     occ_fitted[i] = pow(time[i], theta_fit);
@@ -226,11 +226,11 @@ TimingStats run_percolation(unsigned n_trials, unsigned len, double p, bool rela
   theta_r2 = 1.0 - theta_sumsq_res/occ_ss;
   beta_r2 = 1.0 - beta_sumsq_res/rho_ss;
   double theta_r2_adj = (1.0-(1.0-theta_r2)*(n-1)/(n-2));
-  double beta_r2_adj = (1.0-(1.0-beta_r2)*(n-1)/(n-2));
+  double beta_r2_adj = (1.0-(1.0-beta_r2)*(n-1)/(n-2));*/
 
-  std::cout << "data\t| power law\t| std_dev\t| R^2\t|R^2 (adjusted)\n"
+  /*std::cout << "data\t| power law\t| std_dev\t| R^2\t|R^2 (adjusted)\n"
 	    << "n(t)\t| " << theta_fit << "\t| " << sqrt(theta_cov) << "\t| " << theta_r2 << "\t| " << theta_r2_adj << "\n"
-	    << "rho(t)\t| " << beta_fit << "\t| " << sqrt(beta_cov) << "\t| " << beta_r2 << "\t| " << beta_r2_adj << "\n";
+	    << "rho(t)\t| " << beta_fit << "\t| " << sqrt(beta_cov) << "\t| " << beta_r2 << "\t| " << beta_r2_adj << "\n";*/
 
   delete[] ln_time;
   delete[] ln_occ;
