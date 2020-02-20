@@ -8,6 +8,7 @@
 #include <limits.h>
 
 #define JUMP_THRESH	5
+#define DEFAULT_PRECOMP 4
 
 typedef size_t _uint;
 
@@ -329,7 +330,7 @@ private:
   }
 
 public:
-  BinomialShufflePrecompute(_uint n, double p, double p_precompute_k=4, _uint p_group_size=32) : choose_vals(n+1), bin(n, p), precompute_strings(p_precompute_k), group_size(p_group_size) {
+  BinomialShufflePrecompute(_uint n, double p, double p_precompute_k=DEFAULT_PRECOMP, _uint p_group_size=32) : choose_vals(n+1), bin(n, p), precompute_strings(p_precompute_k), group_size(p_group_size) {
     n_ = n;
     p_ = p;
     //for large bitstrings, it is helpful to chunk results, this mask contains n_ one bits and is safe for n_=<word size>
