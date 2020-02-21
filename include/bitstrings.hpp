@@ -284,6 +284,8 @@ private:
   _uint invert = 0;
   _uint mask = 0;
 
+  _uint jump_thresh = JUMP_THRESH;
+
   _uint get_bit_stream(_uint n, _uint k, _uint x, _uint precompute_limit=0) {
     _uint ret = 0;
     //correction factor to get in terms of n-1 choose k-1
@@ -300,7 +302,7 @@ private:
         //special transformation to map chooseval to choose(n-(i+1)-1, (k-1)-1)
         chooseval *= k;
         chooseval /= n-i-1;
-      } else if (x < JUMP_THRESH*chooseval || i + JUMP_THRESH + 1 > n) {
+      } else if (x < jump_thresh*chooseval || i + jump_thresh + 1 > n) {
 	//std::cout << p_ << " " << (x/chooseval) << std::endl;
         x -= chooseval;
         //special transformation to map chooseval to choose(n-(i+1)-1, k-1)
@@ -379,6 +381,8 @@ public:
       }
     }
   }
+
+  void set_jump(_uint new_threshold) { jump_thresh = new_threshold; }
 
   bool bijectivity_test() {
     for (_uint num_ones = precompute_k; num_ones < group_n; ++num_ones) {

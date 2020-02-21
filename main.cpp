@@ -3,6 +3,7 @@
 #define TEST_DIST 0
 #define TEST_PERC 1
 #define TEST_PROB 2
+#define TEST_TUNE 3
 
 //namespace plt = matplotlibcpp;
 
@@ -136,6 +137,34 @@ typedef PercolationTracker<BinomialShuffleOld> PercBinOld;
 typedef PercolationTracker<BinomialShufflePrecompute> PercBinNew;
 typedef PercolationTracker<FiniteDigit<PoissonOr>> PercHyp;
 typedef PercolationTracker<FiniteDigit<BinomialShufflePrecompute>> PercHyb;
+
+void tune_new_binomial(_uint max_k, _uint min_jump, _uint max_jump, unsigned len, double p, unsigned trials=1000, unsigned seed=DEF_SEED) {
+  std::mt19937 generator;
+  generator.seed(seed);
+
+  _uint best_time = 0;
+  _uint best_k, best_jump;
+
+  for (_uint k = 1; k < max_k; ++k) {
+    BinomialShufflePrecompute test_bin_new(len, p, k);
+    for (_uint j = min_jump; j < max_jump; ++j) {
+      test_bin_new.set_jump(j);
+      auto begin = std::chrono::high_resolution_clock::now();
+      for (_uint i = 0; i < trials; ++i) {
+        test_bin_new(generator);
+      }
+      auto end = std::chrono::high_resolution_clock::now();
+      _uint time = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
+      std::cout << "time taken for jump=" << j << ", k=" << k << ": " << time << "\n";
+      if (best_time == 0 || time < best_time) {
+        best_time = time;
+        best_k = k;
+        best_jump = j;
+      }
+    }
+  }
+  std::cout << "minimum time " << best_time << " for jump=" << best_jump << " k=" << best_k << "\n";
+}
 
 TimingStats run_percolation(unsigned n_trials, unsigned len, double p, bool relax, unsigned t_max=10000, unsigned seed=DEF_SEED) {
   std::mt19937 generator;
@@ -332,6 +361,9 @@ int main(int argc, char** argv) {
     if (strcmp(argv[i], "--probabilities") == 0) {
       test_type = TEST_PROB;
     }
+    if (strcmp(argv[i], "--tune") == 0) {
+      test_type = TEST_TUNE;
+    }
     if (strcmp(argv[i], "-r") == 0 && i != argc - 1) {
       relax = true;
     }
@@ -347,8 +379,8 @@ int main(int argc, char** argv) {
       std::cout << "\ttest type:         distribution\n";
     } else if (test_type == TEST_PROB) {
       std::cout << "\ttest type:         probability\n";
-    } else {
-      std::cout << "\ttest type:         percolation\n";
+    } else if (test_type == TEST_TUNE) {
+      std::cout << "\ttest type:         tuning\n";
     }
   }
 
@@ -363,6 +395,8 @@ int main(int argc, char** argv) {
     timings = run_percolation(n_trials, len, p, relax, n_steps, seed);
   } else if (test_type == TEST_PROB) {
     timings = test_probabilities(n_trials, len, p, seed);
+  } else if (test_type == TEST_TUNE) {
+    tune_new_binomial(10, 2, 10, len, p, n_steps, seed);
   }
   if (silent) {
     std::cout << "time: " << timings.bernoulli_total  << " " << timings.bernoulli_avg
