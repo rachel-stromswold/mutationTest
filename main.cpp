@@ -145,7 +145,7 @@ void tune_new_binomial(_uint max_k, _uint min_jump, _uint max_jump, unsigned len
   _uint best_time = 0;
   _uint best_k, best_jump;
 
-  for (_uint k = 1; k < max_k; ++k) {
+  /*for (_uint k = 1; k < max_k; ++k) {
     BinomialShufflePrecompute test_bin_new(len, p, k);
     for (_uint j = min_jump; j < max_jump; ++j) {
       test_bin_new.set_jump(j);
@@ -162,7 +162,8 @@ void tune_new_binomial(_uint max_k, _uint min_jump, _uint max_jump, unsigned len
         best_jump = j;
       }
     }
-  }
+  }*/
+  BinomialShufflePrecompute test_bin_new(16, p, 8);
   std::cout << "minimum time " << best_time << " for jump=" << best_jump << " k=" << best_k << "\n";
 }
 

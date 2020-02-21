@@ -7,8 +7,8 @@
 #include <math.h>
 #include <limits.h>
 
-#define JUMP_THRESH	5
-#define DEFAULT_PRECOMP 4
+#define JUMP_THRESH	2
+#define DEFAULT_PRECOMP 8
 
 typedef size_t _uint;
 
@@ -288,6 +288,7 @@ private:
 
   _uint get_bit_stream(_uint n, _uint k, _uint x, _uint precompute_limit=0) {
     _uint ret = 0;
+#ifdef MANUAL_COMPUTE
     //correction factor to get in terms of n-1 choose k-1
     //_uint chooseval = choose_vals[n][k]*k/n;
     _uint chooseval = choose_vals[n-1][k-1];
@@ -327,14 +328,28 @@ private:
     if (k > 0 && k <= precompute_limit) {
       ret |= precompute_strings[k][choose_vals[n][k]-x-1];
     }
+#else
+    if (n <= group_size) {
+      return precompute_strings[k][x];
+    }
+
+    _uint total = choose_vals[n/2][0]*choose_vals[n/2][k];
+    for (_uint i = 0; i < k; ++i) {
+      if (x < total) {
+        return get_bit_stream(n/2, i, total - x) | (get_bit_stream(n/2, i, total - x) << (n/2));
+      }
+      total += choose_vals[n/2][i]*choose_vals[n/2][k-i];
+    }
+#endif
 
     return ret;
   }
 
 public:
-  BinomialShufflePrecompute(_uint n, double p, double p_precompute_k=DEFAULT_PRECOMP, _uint p_group_size=32) : choose_vals(n+1), bin(n, p), precompute_strings(p_precompute_k), group_size(p_group_size) {
+  BinomialShufflePrecompute(_uint n, double p, double p_precompute_k=DEFAULT_PRECOMP, _uint p_group_size=16) : choose_vals(n+1), bin(n, p), precompute_strings(p_precompute_k), group_size(p_group_size) {
     n_ = n;
     p_ = p;
+    std::cout << "hi";
     //for large bitstrings, it is helpful to chunk results, this mask contains n_ one bits and is safe for n_=<word size>
     mask = ( ((_uint)1 << (n_-1)) - 1 ) | ( (_uint)1 << (n_-1) );
     n_groups = (n + (group_size-1))/group_size;
@@ -346,12 +361,15 @@ public:
       invert = 0;
     }
     
+#ifdef MANUAL_COMPUTE
     if (n > group_size | p_ != p) {
       n = group_size;
       bin = std::binomial_distribution<_uint>(n, p_);
     }
+#endif
     group_n = n;
     precompute_k = p_precompute_k;
+    std::cout << "group n: " << group_n;
     
     /*if (p > 0.5) {
       p_ = 1 - p;
@@ -373,12 +391,19 @@ public:
       }
     }
 
+#ifndef MANUAL_COMPUTE
+    precompute_k = n;
+#endif
+
     for (_uint k = 0; k < precompute_k; ++k) {
       _uint chooseval = choose(group_n, k);
       precompute_strings[k].resize(chooseval);
+      //std::cout << "precompute_strings[" << k << "] = {";
       for (_uint j = 0; j < chooseval; ++j) {
         precompute_strings[k][j] = mask & get_bit_stream(group_n, k, j);
+        //std::cout << precompute_strings[k][j] << ",";
       }
+      //std::cout << "};\n";
     }
   }
 

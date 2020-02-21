@@ -88,7 +88,7 @@ public:
     auto end = std::chrono::high_resolution_clock::now();
     std::cout << "\n";
     //return the total time taken
-    return std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
+    return std::chrono::duration_cast<std::chrono::microseconds>(end-begin).count();
   }
 };
 
