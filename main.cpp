@@ -164,6 +164,9 @@ void tune_new_binomial(_uint max_k, _uint min_jump, _uint max_jump, unsigned len
     }
   }*/
   BinomialShufflePrecompute test_bin_new(16, p, 8);
+  if (!test_bin_new.bijectivity_test()) {
+    std::cout << "ERROR\n";
+  }
   std::cout << "minimum time " << best_time << " for jump=" << best_jump << " k=" << best_k << "\n";
 }
 

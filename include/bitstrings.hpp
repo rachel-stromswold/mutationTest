@@ -288,6 +288,12 @@ private:
 
   _uint get_bit_stream(_uint n, _uint k, _uint x, _uint precompute_limit=0) {
     _uint ret = 0;
+
+    _uint flip = 0;
+    if (k > n/2) {
+      flip = (1 << (n-1)) | ((1 << (n-1))-1);
+      k = n-k;
+    }
 #ifdef MANUAL_COMPUTE
     //correction factor to get in terms of n-1 choose k-1
     //_uint chooseval = choose_vals[n][k]*k/n;
@@ -329,20 +335,59 @@ private:
       ret |= precompute_strings[k][choose_vals[n][k]-x-1];
     }
 #else
-    if (n <= group_size) {
-      return precompute_strings[k][x];
-    }
-
-    _uint total = choose_vals[n/2][0]*choose_vals[n/2][k];
-    for (_uint i = 0; i < k; ++i) {
-      if (x < total) {
-        return get_bit_stream(n/2, i, total - x) | (get_bit_stream(n/2, i, total - x) << (n/2));
+    if (precompute_limit > 0) {
+      if (n <= group_size) {
+	return precompute_strings[k][x] ^ flip;
       }
-      total += choose_vals[n/2][i]*choose_vals[n/2][k-i];
+      _uint left_size = (n+1)/2;
+      _uint right_size = n-left_size;
+
+      _uint total = choose_vals[n/2][0]*choose_vals[n/2][k];
+      for (_uint i = 0; i < k; ++i) {
+	if (x < total) {
+	  _uint right_x = (total - x) / choose_vals[right_size][k-i];
+	  _uint left_x = (total - x) % choose_vals[right_size][k-i];
+	  return get_bit_stream(left_size, i, left_x, precompute_limit)
+	      | (get_bit_stream(right_size, i, right_x, precompute_limit) << (n/2));
+	}
+	total += choose_vals[left_size][i]*choose_vals[right_size][k-i];
+      }
+    } else {
+      //correction factor to get in terms of n-1 choose k-1
+      //_uint chooseval = choose_vals[n][k]*k/n;
+      _uint chooseval = choose_vals[n-1][k-1];
+      //note that we only go to i=n-2 to avoid a divide by zero, the i=n-1 case is handled after the loop
+      _uint i = 0;
+
+      for (; k > 0 && i < n-1; ++i) {
+	if (x < chooseval) {
+	  ret = ret | ((_uint)1 << i);
+	  --k;
+	  //special transformation to map chooseval to choose(n-(i+1)-1, (k-1)-1)
+	  chooseval *= k;
+	  chooseval /= n-i-1;
+	} else if (x < jump_thresh*chooseval || i + jump_thresh + 1 > n) {
+	  x -= chooseval;
+	  //special transformation to map chooseval to choose(n-(i+1)-1, k-1)
+	  chooseval *= n-i-k;
+	  chooseval /= n-i-1;
+	} else {
+	  _uint jj = x / chooseval;
+	  //sum_{j=0}^{jj} choose(n-1-jj+k, k) = choose(n-k+jj, k) - choose(n+k-jj-1, k)
+	  chooseval = choose_vals[n-i-jj-1][k-1];
+	  x -= choose_vals[n-i][k] - chooseval*(n-i-jj)/k;
+	  i += jj-1;
+	}
+      }
+
+      if (x < chooseval) {
+	ret = ret | ((_uint)1 << i);
+	--k;
+      }
     }
 #endif
 
-    return ret;
+    return ret ^ flip;
   }
 
 public:
@@ -392,7 +437,9 @@ public:
     }
 
 #ifndef MANUAL_COMPUTE
-    precompute_k = n;
+    group_n = group_size;
+    precompute_k = n/2 + 1;
+    precompute_strings.resize(precompute_k);
 #endif
 
     for (_uint k = 0; k < precompute_k; ++k) {
@@ -410,7 +457,7 @@ public:
   void set_jump(_uint new_threshold) { jump_thresh = new_threshold; }
 
   bool bijectivity_test() {
-    for (_uint num_ones = precompute_k; num_ones < group_n; ++num_ones) {
+    for (_uint num_ones = 0; num_ones < group_n; ++num_ones) {
       std::cout << "num_ones=" << num_ones << " N choose num_ones=" << choose_vals[group_n][num_ones] << std::endl;
       for (_uint i = 0; i < choose_vals[group_n][num_ones]; ++i) {
         for (_uint j = i+1; j < choose_vals[group_n][num_ones]; ++j) {
@@ -431,48 +478,41 @@ public:
   template <class Generator>
   _uint operator()(Generator& g) {
     _uint result = 0;
+#ifdef MANUAL_COMPUTE
     for (_uint i = 0; i < n_groups; ++i) {
       _uint num_ones = bin(g);
 
       if (num_ones != 0) {
         //minus 1 because we start indexing from 0
         std::uniform_int_distribution<_uint> unif(0, choose_vals[group_n][num_ones] - 1);
-        //UniformInt<_uint> unif(0, choose_vals[num_ones]);
         _uint j = unif(g);
         _uint tmp = 0;
         if (num_ones < precompute_k) {
           tmp = precompute_strings[num_ones][j] << (i*group_size);
-          //result |= precompute_strings[num_ones][j] << (i*group_size);
         } else {
           tmp = get_bit_stream(group_n, num_ones, j, precompute_k-1) << (i*group_size);
-          //result |= get_bit_stream(group_n, num_ones, j, precompute_k-1) << (i*group_size);
-          //result |= get_bit_stream(group_n, num_ones, j) << (i*group_size);
         }
         result |= tmp;
 
-        /*_uint garbage = (result >> (i*group_size)) & (((_uint)1 << (i*group_size)) - 1);
-        tmp = (tmp >> (i*group_size)) & (((_uint)1 << (i*group_size)) - 1);
-        if (garbage != tmp) {
-          std::cout << "yikes! " << garbage << " " << tmp << std::endl
-                    << "       " << num_ones << " " << pre_result << std::endl;
-        }*/
       }
     }
-    /*if ( 1 & (invert ^ result) ) {
-      prob_1 = (prob_1*(double)n_samples + 1.0)/(n_samples+1);
-    } else {
-      prob_1 = prob_1*(double)n_samples / (n_samples+1);
+#else
+    _uint num_ones = bin(g);
+
+    if (num_ones != 0) {
+      //minus 1 because we start indexing from 0
+      std::uniform_int_distribution<_uint> unif(0, choose_vals[group_n][num_ones] - 1);
+      _uint j = unif(g);
+      _uint tmp = 0;
+      if (num_ones < precompute_k) {
+	tmp = precompute_strings[num_ones][j];
+      } else {
+	tmp = get_bit_stream(n_, num_ones, j, precompute_k-1);
+      }
+      result |= tmp;
+
     }
-    ++n_samples;
-    if ( 1 & (invert ^ (result >> (n_/2))) ) {
-      prob_1 = (prob_1*(double)n_samples + 1.0)/(n_samples+1);
-    } else {
-      prob_1 = prob_1*(double)n_samples / (n_samples+1);
-    }
-    ++n_samples;
-    if (n_samples % 10000 == 0) {
-      std::cout << "prob_" << n_samples << ":" << prob_1 << std::endl;
-    }*/
+#endif
     return mask & (invert ^ result);
   }
 };
