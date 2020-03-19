@@ -7,7 +7,7 @@
 #include <math.h>
 #include <limits.h>
 
-#define JUMP_THRESH	2
+#define JUMP_THRESH	5
 #define DEFAULT_PRECOMP 8
 
 typedef size_t _uint;
@@ -406,12 +406,11 @@ public:
       invert = 0;
     }
     
-#ifdef MANUAL_COMPUTE
     if (n > group_size | p_ != p) {
       n = group_size;
       bin = std::binomial_distribution<_uint>(n, p_);
     }
-#endif
+
     group_n = n;
     precompute_k = p_precompute_k;
     std::cout << "group n: " << group_n;
